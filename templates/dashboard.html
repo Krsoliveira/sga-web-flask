@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>SGA - Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Dashboard de Relatórios</h1>
+        {% if session['dados_usuario'] %}
+        <p>Bem-vindo(a), <b>{{ session['dados_usuario'][1] }}</b>! (Nível: {{ session['dados_usuario'][2] }})</p>
+        {% endif %}
+        <a href="{{ url_for('logout') }}">Sair (Logout)</a>
+        <hr>
+
+        <form action="{{ url_for('novo_relatorio') }}" method="POST" style="margin-bottom: 20px;">
+            <input type="submit" value="Criar Novo Relatório" style="width: auto; padding: 10px 20px;">
+        </form>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <h2>Relatórios Cadastrados</h2>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>Nº Relatório</th>
+                    <th>Título</th>
+                    <th>Situação</th>
+                    <th style="text-align: center;">Ações</th> </tr>
+            </thead>
+            <tbody>
+                {% for caso in casos %}
+                <tr>
+                    <td>{{ caso.numero_relatorio }}</td>  <td>{{ caso.titulo }}</td>            <td>{{ caso.status }}</td>            <td>
+                        <div class="action-links">
+                            <a href="{{ url_for('ver_relatorio', id_caso=caso.id) }}">Abrir</a>
+                            <form action="{{ url_for('deletar_relatorio_rota', id_caso=caso.id) }}" method="POST">
+                                <button type="submit" ...>Deletar</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>

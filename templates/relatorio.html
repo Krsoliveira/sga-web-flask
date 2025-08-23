@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>SGA - Detalhes do Relatório</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Detalhes do Relatório: {{ caso.titulo }}</h1>
+        <a href="{{ url_for('dashboard') }}"><< Voltar para o Dashboard</a>
+        <hr>
+
+        <h2>Cabeçalho</h2>
+        <p>
+            <strong>Nº Relatório:</strong> {{ caso.numero_relatorio }} <br>
+            <strong>Situação:</strong> {{ caso.status }} <br>
+            <strong>Período:</strong> de {{ caso.data_inicio }} até {{ caso.data_final or '...' }}
+        </p>
+        <hr>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <h2>{% if atividade_edicao %}Editando Atividade nº {{ atividade_edicao.id }}{% else %}Adicionar Nova Atividade{% endif %}</h2>
+        
+        <form action="{{ url_for('salvar_atividade_rota', id_caso=caso.id) }}" method="POST">
+            <input type="hidden" name="id_atividade" value="{{ atividade_edicao.id if atividade_edicao }}">
+            
+            <!-- Nova estrutura de Grid para o formulário -->
+            <div class="form-grid">
+                <label for="atividade_desc" class="span-all">Atividade:</label>
+                <select id="atividade_desc" name="atividade_desc" class="span-all" required>
+                    <option value="">Selecione uma atividade...</option>
+                    {% for atividade in opcoes_atividade %}
+                        <option value="{{ atividade }}" {% if atividade_edicao and atividade_edicao.atividade_desc == atividade %}selected{% endif %}>
+                            {{ atividade }}
+                        </option>
+                    {% endfor %}
+                </select>
+
+                <label for="testes_realizados" class="span-all">Testes Realizados:</label>
+                <input type="text" id="testes_realizados" name="testes_realizados" class="span-all" value="{{ atividade_edicao.testes_realizados if atividade_edicao }}">
+
+                <label for="extensao_exames">Extensão dos Exames:</label>
+                <input type="text" id="extensao_exames" name="extensao_exames" value="{{ atividade_edicao.extensao_exames if atividade_edicao }}">
+
+                <label for="criterio_amostragem">Critério da Amostragem:</label>
+                <input type="text" id="criterio_amostragem" name="criterio_amostragem" value="{{ atividade_edicao.criterio_amostragem if atividade_edicao }}">
+
+                <label for="periodo_situacao">Período Abrangido:</label>
+                <input type="date" id="periodo_situacao" name="periodo_situacao" value="{{ atividade_edicao.periodo_situacao if atividade_edicao }}">
+
+                <label for="situacao">Situação da Atividade:</label>
+                <select id="situacao" name="situacao">
+                    <option value="">Selecione...</option>
+                    {% for situacao in opcoes_situacao %}
+                        <option value="{{ situacao }}" {% if atividade_edicao and atividade_edicao.situacao == situacao %}selected{% endif %}>
+                            {{ situacao }}
+                        </option>
+                    {% endfor %}
+                </select>
+
+                <label for="observacao_resumo" class="span-all">Observação / Resumo:</label>
+                <input type="text" id="observacao_resumo" name="observacao_resumo" class="span-all" value="{{ atividade_edicao.observacao_resumo if atividade_edicao }}">
+            </div>
+
+            <div class="form-actions">
+                <input type="submit" value="Salvar Atividade">
+                {% if atividade_edicao %}
+                    <a href="{{ url_for('ver_relatorio', id_caso=caso.id) }}" class="cancel-button">Cancelar Edição</a>
+                {% endif %}
+            </div>
+        </form>
+        <hr>
+
+        <h2>Atividades Registradas</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Nº</th>
+                    <th>Atividade</th>
+                    <th>Observação / Resumo</th>
+                    <th>Situação</th>
+                    <th style="text-align: center;">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ativ in atividades %}
+                <tr>
+                    <td>{{ ativ.id }}</td>
+                    <td>{{ ativ.atividade_desc }}</td>
+                    <td>{{ ativ.observacao_resumo }}</td>
+                    <td>{{ ativ.situacao }}</td>
+                    <td>
+                        <div class="action-links">
+                            <a href="{{ url_for('ver_relatorio', id_caso=caso.id, editar=ativ.id) }}">Editar</a>
+                            <form action="{{ url_for('deletar_atividade_rota', id_atividade=ativ.id) }}" method="POST">
+                                <input type="hidden" name="id_caso" value="{{ caso.id }}">
+                                <button type="submit" class="delete-button" onclick="return confirm('Tem certeza?');">Deletar</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" style="text-align: center;">Nenhuma atividade registrada.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>

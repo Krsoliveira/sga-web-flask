@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>SGA - Gestão de Usuários</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Gestão de Usuários</h1>
+        <a href="{{ url_for('dashboard') }}"><< Voltar para o Dashboard</a>
+        
+        <div style="margin-top: 20px; margin-bottom: 20px;">
+            <a href="{{ url_for('criar_usuario') }}" class="button-like">Adicionar Novo Usuário</a>
+        </div>
+        
+        <hr>
+
+        <h2>Usuários Cadastrados</h2>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Código</th>
+                    <th>Nome Completo</th>
+                    <th>Username</th>
+                    <th>Papel</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for usuario in usuarios %}
+                <tr>
+                    <td>{{ usuario.id }}</td>
+                    <td>{{ usuario.codigo }}</td>
+                    <td>{{ usuario.nome_completo }}</td>
+                    <td>{{ usuario.username }}</td>
+                    <td>{{ usuario.role }}</td>
+                    <td>
+                        <a href="{{ url_for('editar_usuario', user_id=usuario.id) }}">Editar</a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" style="text-align: center;">Nenhum usuário encontrado.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>

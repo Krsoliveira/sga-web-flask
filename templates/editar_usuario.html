@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>SGA - Editar Usuário</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Editando Usuário: {{ usuario.nome_completo }}</h1>
+        {% if session['dados_usuario']['role'] == 'Admin' %}
+    <a href="{{ url_for('gestao_usuarios') }}"><< Voltar para a Gestão de Usuários</a>
+{% else %}
+    <a href="{{ url_for('dashboard') }}"><< Voltar para o Dashboard</a>
+{% endif %}
+        <hr>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form action="{{ url_for('editar_usuario', user_id=usuario.id) }}" method="POST">
+            <label for="codigo">Código do Colaborador:</label>
+            <input type="text" id="codigo" name="codigo" value="{{ usuario.codigo }}" required>
+
+            <label for="nome_completo">Nome Completo:</label>
+            <input type="text" id="nome_completo" name="nome_completo" value="{{ usuario.nome_completo }}" required>
+
+            <label for="username">Nome de Usuário (username):</label>
+            <input type="text" id="username" name="username" value="{{ usuario.username }}" readonly class="readonly-input">
+
+            <label for="role">Papel:</label>
+            <select id="role" name="role" required>
+                {% for role in roles %}
+                    <option value="{{ role }}" {% if role == usuario.role %}selected{% endif %}>
+                        {{ role }}
+                    </option>
+                {% endfor %}
+            </select>
+            
+            <hr>
+            <p><i>Deixe os campos de senha em branco para não a alterar.</i></p>
+            <label for="nova_senha">Nova Senha:</label>
+            <input type="password" id="nova_senha" name="nova_senha">
+
+            <label for="confirmar_senha">Confirmar Nova Senha:</label>
+            <input type="password" id="confirmar_senha" name="confirmar_senha">
+            
+            <div class="form-actions" style="text-align: left; margin-top: 20px;">
+                <input type="submit" value="Salvar Alterações">
+            </div>
+        </form>
+
+    </div>
+</body>
+</html>

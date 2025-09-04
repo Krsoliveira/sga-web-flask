@@ -32,7 +32,6 @@
         <form action="{{ url_for('salvar_atividade_rota', id_caso=caso.id) }}" method="POST">
             <input type="hidden" name="id_atividade" value="{{ atividade_edicao.id if atividade_edicao }}">
             
-            <!-- Nova estrutura de Grid para o formulário -->
             <div class="form-grid">
                 <label for="atividade_desc" class="span-all">Atividade:</label>
                 <select id="atividade_desc" name="atividade_desc" class="span-all" required>
@@ -53,8 +52,11 @@
                 <label for="criterio_amostragem">Critério da Amostragem:</label>
                 <input type="text" id="criterio_amostragem" name="criterio_amostragem" value="{{ atividade_edicao.criterio_amostragem if atividade_edicao }}">
 
-                <label for="periodo_situacao">Período Abrangido:</label>
-                <input type="date" id="periodo_situacao" name="periodo_situacao" value="{{ atividade_edicao.periodo_situacao if atividade_edicao }}">
+                <label for="periodo_inicio">Período - De:</label>
+                <input type="date" id="periodo_inicio" name="periodo_inicio" value="{{ atividade_edicao.periodo_inicio if atividade_edicao }}">
+
+                <label for="periodo_fim">Período - Até:</label>
+                <input type="date" id="periodo_fim" name="periodo_fim" value="{{ atividade_edicao.periodo_fim if atividade_edicao }}">
 
                 <label for="situacao">Situação da Atividade:</label>
                 <select id="situacao" name="situacao">
@@ -85,6 +87,7 @@
                 <tr>
                     <th>Nº</th>
                     <th>Atividade</th>
+                    <th>Realizado Por</th>
                     <th>Observação / Resumo</th>
                     <th>Situação</th>
                     <th style="text-align: center;">Ações</th>
@@ -95,6 +98,7 @@
                 <tr>
                     <td>{{ ativ.id }}</td>
                     <td>{{ ativ.atividade_desc }}</td>
+                    <td>{{ ativ.realizado_por_nome or 'Usuário não encontrado' }}</td>
                     <td>{{ ativ.observacao_resumo }}</td>
                     <td>{{ ativ.situacao }}</td>
                     <td>
@@ -109,7 +113,7 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="5" style="text-align: center;">Nenhuma atividade registrada.</td>
+                    <td colspan="6" style="text-align: center;">Nenhuma atividade registrada.</td>
                 </tr>
                 {% endfor %}
             </tbody>

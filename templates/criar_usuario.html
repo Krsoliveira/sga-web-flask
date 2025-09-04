@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>SGA - Criar Novo Usuário</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Adicionar Novo Usuário</h1>
+        <a href="{{ url_for('gestao_usuarios') }}"><< Voltar para a Gestão de Usuários</a>
+        <hr>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form action="{{ url_for('criar_usuario') }}" method="POST">
+            <label for="codigo">Código do Colaborador:</label>
+            <input type="text" id="codigo" name="codigo" required>
+
+            <label for="nome_completo">Nome Completo:</label>
+            <input type="text" id="nome_completo" name="nome_completo" required>
+
+            <label for="senha">Senha Provisória:</label>
+            <input type="password" id="senha" name="senha" required>
+
+            <label for="role">Papel:</label>
+            <select id="role" name="role" required>
+                <option value="">Selecione um papel...</option>
+                {% for role in roles %}
+                    <option value="{{ role }}">{{ role }}</option>
+                {% endfor %}
+            </select>
+            
+            <div class="form-actions" style="text-align: left; margin-top: 20px;">
+                <input type="submit" value="Criar Usuário">
+            </div>
+        </form>
+
+    </div>
+</body>
+</html>

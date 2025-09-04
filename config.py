@@ -1,7 +1,3 @@
-"""
-Arquivo de configuração para a aplicação.
-Armazena valores e listas que podem ser alterados sem mexer na lógica principal.
-"""
 
 # Lista de opções para o dropdown de atividades nos relatórios
 LISTA_ATIVIDADES = [
@@ -15,3 +11,11 @@ LISTA_ATIVIDADES = [
 
 # Lista de opções para o dropdown de situação das atividades
 LISTA_SITUACAO = ["ABERTO", "FINALIZADO", "AGUARD. JUSTIF.", "PENDENTE"]
+
+# Lista de opções para o dropdown de níveis de acesso de usuários
+LISTA_NIVEIS_ACESSO = ["Junior", "Pleno", "Senior", "Manager", "Admin"]
+
+# ... (outras listas) ...
+
+# Lista de opções para o dropdown de papéis de usuários
+LISTA_ROLES = ["Auditor", "Manager", "Admin"]

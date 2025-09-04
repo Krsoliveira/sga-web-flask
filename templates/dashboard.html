@@ -9,9 +9,16 @@
     <div class="container">
         <h1>Dashboard de Relatórios</h1>
         {% if session['dados_usuario'] %}
-        <p>Bem-vindo(a), <b>{{ session['dados_usuario'][1] }}</b>! (Nível: {{ session['dados_usuario'][2] }})</p>
+        <p>Bem-vindo(a), <b>{{ session['dados_usuario']['nome'] }}</b>! (Papel: {{ session['dados_usuario']['role'] }})</p>
         {% endif %}
-        <a href="{{ url_for('logout') }}">Sair (Logout)</a>
+        
+        <div style="margin-bottom: 20px;">
+            {% if session['dados_usuario']['role'] == 'Admin' %}
+                <a href="{{ url_for('gestao_usuarios') }}" style="margin-right: 20px;">Gerir Usuários</a>
+            {% endif %}
+            <a href="{{ url_for('editar_usuario', user_id=session['dados_usuario']['id']) }}" style="margin-right: 20px;">Meu Perfil</a>
+            <a href="{{ url_for('logout') }}">Sair (Logout)</a>
+        </div>
         <hr>
 
         <form action="{{ url_for('novo_relatorio') }}" method="POST" style="margin-bottom: 20px;">
@@ -34,16 +41,23 @@
                     <th>Nº Relatório</th>
                     <th>Título</th>
                     <th>Situação</th>
-                    <th style="text-align: center;">Ações</th> </tr>
+                    <th style="text-align: center;">Ações</th>
+                </tr>
             </thead>
             <tbody>
                 {% for caso in casos %}
                 <tr>
-                    <td>{{ caso.numero_relatorio }}</td>  <td>{{ caso.titulo }}</td>            <td>{{ caso.status }}</td>            <td>
+                    <td>{{ caso.numero_relatorio }}</td>
+                    <td>{{ caso.titulo }}</td>
+                    <td>{{ caso.status }}</td>
+                    <td>
                         <div class="action-links">
                             <a href="{{ url_for('ver_relatorio', id_caso=caso.id) }}">Abrir</a>
                             <form action="{{ url_for('deletar_relatorio_rota', id_caso=caso.id) }}" method="POST">
-                                <button type="submit" ...>Deletar</button>
+                                <button type="submit" class="delete-button"
+                                        onclick="return confirm('Tem certeza que deseja deletar este relatório permanentemente?');">
+                                    Deletar
+                                </button>
                             </form>
                         </div>
                     </td>

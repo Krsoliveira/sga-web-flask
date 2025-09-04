@@ -7,3 +7,6 @@ venv_web/
 # Arquivos de cache do Python
 __pycache__/
 *.pyc
+
+# Arquivos de banco de dados
+gerenciador.db

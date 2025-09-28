@@ -12,12 +12,15 @@ app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY')
 
 # =============================================
-# ==== INJETOR DE CONTEXTO GLOBAL ====
+# ==== INJETOR DE CONTEXTO GLOBAL (ESSENCIAL) ====
 # =============================================
 @app.context_processor
 def inject_user():
-    usuario_logado = session.get('dados_usuario')
-    return dict(usuario=usuario_logado)
+    """
+    Injeta a variável 'usuario' no contexto de todos os templates.
+    O valor será o dicionário do usuário se ele estiver logado, ou None caso contrário.
+    """
+    return dict(usuario=session.get('dados_usuario'))
 
 # =============================================
 # ==== DECORADORES ====
@@ -57,7 +60,7 @@ def home():
 def login():
     if 'dados_usuario' in session:
         return redirect(url_for('dashboard'))
-        
+
     if request.method == 'POST':
         codigo = request.form['codigo']
         senha = request.form['senha']
@@ -96,7 +99,7 @@ def novo_relatorio():
     else:
         flash('Erro ao criar novo relatório.', 'danger')
         return redirect(url_for('dashboard'))
-    
+
 @app.route('/relatorio/<int:id_caso>', methods=['GET'])
 @login_required
 def ver_relatorio(id_caso):
@@ -128,13 +131,11 @@ def adicionar_atividade(id_caso):
         'data_registro': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         'situacao': request.form.get('situacao')
     }
-
     try:
         db.salvar_atividade(dados_formulario)
         flash('Atividade registrada com sucesso!', 'success')
     except Exception as e:
         flash(f'Ocorreu um erro ao salvar a atividade: {e}', 'danger')
-
     return redirect(url_for('ver_relatorio', id_caso=id_caso))
 
 @app.route('/relatorio/<int:id_caso>/submeter', methods=['POST'])
@@ -304,4 +305,4 @@ def get_atividade_details(id_atividade):
         return jsonify({'error': 'Atividade não encontrada'}), 404
 
 if __name__ == '__main__':
-    app.run(debug=True)    
+    app.run(debug=True)

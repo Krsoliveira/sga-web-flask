@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}Editar Atividade{% endblock %}
+
+{% from "_macros.html" import render_breadcrumb %}
+
+{% block breadcrumb %}
+    {% set breadcrumb_items = [
+        {'url': url_for('dashboard'), 'text': 'Dashboard'},
+        {'url': url_for('ver_relatorio', id_caso=caso.id), 'text': 'Relatório ' ~ caso.numero_relatorio},
+        {'url': '#', 'text': 'Editar Atividade', 'active': True}
+    ] %}
+    {{ render_breadcrumb(breadcrumb_items) }}
+    <hr class="mt-0 mb-4">
+{% endblock %}
+
+{% block content %}
+    <h1 class="h3 mb-4">Editar Atividade</h1>
+
+    <form action="" method="POST">
+        <div class="mb-3">
+            <label for="atividade_desc" class="form-label">Descrição da Atividade (Ponto de Auditoria)</label>
+            <select class="form-select" id="atividade_desc" name="atividade_desc" required>
+                <option disabled value="">Selecione um ponto de auditoria...</option>
+                {% for opcao in opcoes_atividade %}
+                <option value="{{ opcao }}" {% if opcao == atividade.atividade_desc %}selected{% endif %}>{{ opcao }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="mb-3">
+            <label for="testes_realizados" class="form-label">Testes Realizados</label>
+            <textarea class="form-control" id="testes_realizados" name="testes_realizados" rows="3" required>{{ atividade.testes_realizados }}</textarea>
+        </div>
+        <div class="mb-3">
+            <label for="observacao_resumo" class="form-label">Observação / Resumo dos Achados</label>
+            <textarea class="form-control" id="observacao_resumo" name="observacao_resumo" rows="3">{{ atividade.observacao_resumo }}</textarea>
+        </div>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="nao_conformidade" class="form-label">Não Conformidade (Opcional)</label>
+                <input type="text" class="form-control" id="nao_conformidade" name="nao_conformidade" value="{{ atividade.nao_conformidade }}">
+            </div>
+            <div class="col-md-6 mb-3">
+                <label for="situacao" class="form-label">Situação</label>
+                <select class="form-select" id="situacao" name="situacao" required>
+                    {% for opcao in opcoes_situacao %}
+                    <option value="{{ opcao }}" {% if opcao == atividade.situacao %}selected{% endif %}>{{ opcao }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="mb-3">
+            <label for="recomendacao" class="form-label">Recomendação (Opcional)</label>
+            <textarea class="form-control" id="recomendacao" name="recomendacao" rows="2">{{ atividade.recomendacao }}</textarea>
+        </div>
+        <div class="d-flex justify-content-end">
+            <a href="{{ url_for('ver_relatorio', id_caso=caso.id) }}" class="btn btn-secondary me-2">Cancelar</a>
+            <button type="submit" class="btn btn-primary">Salvar Alterações</button>
+        </div>
+    </form>
+{% endblock %}

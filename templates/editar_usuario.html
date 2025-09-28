@@ -9,10 +9,10 @@
     <div class="container">
         <h1>Editando Usuário: {{ usuario.nome_completo }}</h1>
         {% if session['dados_usuario']['role'] == 'Admin' %}
-    <a href="{{ url_for('gestao_usuarios') }}"><< Voltar para a Gestão de Usuários</a>
-{% else %}
-    <a href="{{ url_for('dashboard') }}"><< Voltar para o Dashboard</a>
-{% endif %}
+            <a href="{{ url_for('gestao_usuarios') }}"><< Voltar para a Gestão de Usuários</a>
+        {% else %}
+            <a href="{{ url_for('dashboard') }}"><< Voltar para o Dashboard</a>
+        {% endif %}
         <hr>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -38,6 +38,16 @@
                 {% for role in roles %}
                     <option value="{{ role }}" {% if role == usuario.role %}selected{% endif %}>
                         {{ role }}
+                    </option>
+                {% endfor %}
+            </select>
+
+            <label for="gerente_id">Gerente Direto:</label>
+            <select id="gerente_id" name="gerente_id">
+                <option value="">Nenhum</option>
+                {% for gerente in gerentes %}
+                    <option value="{{ gerente.id }}" {% if gerente.id == usuario.gerente_id %}selected{% endif %}>
+                        {{ gerente.nome_completo }}
                     </option>
                 {% endfor %}
             </select>

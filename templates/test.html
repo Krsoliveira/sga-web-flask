@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Teste de Contexto</title>
+</head>
+<body>
+    <h1>Teste de Contexto do Usuário</h1>
+    
+    {% if usuario %}
+        <p style="color: green; font-weight: bold;">SUCESSO: A variável 'usuario' foi encontrada!</p>
+        <p>Conteúdo da variável:</p>
+        <pre>{{ usuario }}</pre>
+    {% else %}
+        <p style="color: red; font-weight: bold;">FALHA: A variável 'usuario' NÃO foi encontrada ou está vazia.</p>
+    {% endif %}
+
+</body>
+</html>

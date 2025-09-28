@@ -2,6 +2,7 @@ import sqlite3
 import hashlib
 from datetime import date, datetime
 from contextlib import contextmanager
+import os
 
 DB_NAME = 'gerenciador.db'
 
@@ -33,12 +34,15 @@ def inicializar_banco():
             nome_completo TEXT NOT NULL,
             username TEXT UNIQUE NOT NULL, 
             password_hash TEXT NOT NULL,
-            role TEXT NOT NULL DEFAULT 'Auditor'
+            role TEXT NOT NULL DEFAULT 'Auditor',
+            gerente_id INTEGER,
+            FOREIGN KEY (gerente_id) REFERENCES usuarios (id)
         )''')
         cursor.execute('''
         CREATE TABLE IF NOT EXISTS casos (
             id INTEGER PRIMARY KEY AUTOINCREMENT, titulo TEXT NOT NULL, numero_relatorio TEXT UNIQUE,
-            tipo TEXT NOT NULL, data_inicio TEXT NOT NULL, data_final TEXT, status TEXT NOT NULL
+            tipo TEXT NOT NULL, data_inicio TEXT NOT NULL, data_final TEXT, 
+            status TEXT NOT NULL, notas_revisao TEXT
         )''')
         cursor.execute('''
         CREATE TABLE IF NOT EXISTS atividades (
@@ -48,6 +52,7 @@ def inicializar_banco():
             periodo_fim TEXT,
             observacao_resumo TEXT, 
             realizado_por_id INTEGER,
+            ultima_modificacao_por_id INTEGER,
             nao_conformidade TEXT, reincidente INTEGER, recomendacao TEXT,
             data_p_solucao TEXT, data_registro TEXT NOT NULL, situacao TEXT,
             FOREIGN KEY (caso_id) REFERENCES casos (id) ON DELETE CASCADE,
@@ -62,14 +67,13 @@ def inicializar_banco():
         conn.commit()
         cursor.execute("PRAGMA foreign_keys = ON;")
 
-
-def adicionar_usuario(codigo, nome_completo, username, senha, role):
+def adicionar_usuario(codigo, nome_completo, username, senha, role, gerente_id=None):
     try:
         with get_db_conn() as conn:
             cursor = conn.cursor()
             senha_hash = hashlib.sha256(senha.encode()).hexdigest()
-            cursor.execute('INSERT INTO usuarios (codigo, nome_completo, username, password_hash, role) VALUES (?, ?, ?, ?, ?)', 
-                           (codigo, nome_completo, username, senha_hash, role))
+            cursor.execute('INSERT INTO usuarios (codigo, nome_completo, username, password_hash, role, gerente_id) VALUES (?, ?, ?, ?, ?, ?)', 
+                           (codigo, nome_completo, username, senha_hash, role, gerente_id))
             conn.commit()
         return True
     except sqlite3.IntegrityError:
@@ -93,6 +97,47 @@ def verificar_login(codigo, senha):
                 }
     return None
 
+def buscar_usuario_por_codigo(codigo):
+    with get_db_conn() as conn:
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("SELECT nome_completo FROM usuarios WHERE codigo = ?", (codigo,))
+        usuario = cursor.fetchone()
+        return dict(usuario) if usuario else None
+
+def buscar_todos_usuarios():
+    with get_db_conn() as conn:
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, codigo, nome_completo, username, role, gerente_id FROM usuarios ORDER BY nome_completo")
+        return [dict(row) for row in cursor.fetchall()]
+
+def buscar_usuario_por_id(user_id):
+    with get_db_conn() as conn:
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM usuarios WHERE id = ?", (user_id,))
+        usuario = cursor.fetchone()
+        return dict(usuario) if usuario else None
+
+def atualizar_usuario(user_id, dados):
+    query = "UPDATE usuarios SET codigo = ?, nome_completo = ?, username = ?, role = ?, gerente_id = ?"
+    params = [dados['codigo'], dados['nome_completo'], dados['username'], dados['role'], dados['gerente_id']]
+    if dados.get('nova_senha'):
+        nova_senha_hash = hashlib.sha256(dados['nova_senha'].encode()).hexdigest()
+        query += ", password_hash = ?"
+        params.append(nova_senha_hash)
+    query += " WHERE id = ?"
+    params.append(user_id)
+    try:
+        with get_db_conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute(query, tuple(params))
+            conn.commit()
+        return True
+    except sqlite3.IntegrityError:
+        return False
+
 def deletar_relatorio_e_registrar_log(id_caso, usuario_codigo, usuario_nome):
     try:
         with get_db_conn() as conn:
@@ -111,50 +156,11 @@ def deletar_relatorio_e_registrar_log(id_caso, usuario_codigo, usuario_nome):
         print(f"Ocorreu um erro na exclusão segura: {e}")
         return False
 
-def buscar_todos_usuarios():
-    """Busca todos os usuários cadastrados no sistema."""
-    with get_db_conn() as conn:
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, codigo, nome_completo, username, role FROM usuarios ORDER BY nome_completo")
-        return [dict(row) for row in cursor.fetchall()]
-
-def buscar_usuario_por_id(user_id):
-    """Busca um único usuário pelo seu ID."""
-    with get_db_conn() as conn:
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, codigo, nome_completo, username, role FROM usuarios WHERE id = ?", (user_id,))
-        usuario = cursor.fetchone()
-        return dict(usuario) if usuario else None
-
-def atualizar_usuario(user_id, dados):
-    """Atualiza os dados de um usuário no banco de dados."""
-    query = "UPDATE usuarios SET codigo = ?, nome_completo = ?, username = ?, role = ?"
-    params = [dados['codigo'], dados['nome_completo'], dados['username'], dados['role']]
-
-    if dados.get('nova_senha'):
-        nova_senha_hash = hashlib.sha256(dados['nova_senha'].encode()).hexdigest()
-        query += ", password_hash = ?"
-        params.append(nova_senha_hash)
-
-    query += " WHERE id = ?"
-    params.append(user_id)
-
-    try:
-        with get_db_conn() as conn:
-            cursor = conn.cursor()
-            cursor.execute(query, tuple(params))
-            conn.commit()
-        return True
-    except sqlite3.IntegrityError:
-        return False
-
 def buscar_casos():
     with get_db_conn() as conn:
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        cursor.execute("SELECT id, titulo, data_inicio, data_final, status, numero_relatorio FROM casos ORDER BY data_inicio DESC")
+        cursor.execute("SELECT * FROM casos ORDER BY data_inicio DESC")
         return [dict(row) for row in cursor.fetchall()]
 
 def adicionar_novo_caso(titulo, tipo, data_inicio, status):
@@ -177,6 +183,39 @@ def buscar_caso_por_id(id_caso):
         cursor.execute("SELECT * FROM casos WHERE id = ?", (id_caso,))
         resultado = cursor.fetchone()
         return dict(resultado) if resultado else None
+
+def atualizar_status_relatorio(id_caso, novo_status):
+    try:
+        with get_db_conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE casos SET status = ? WHERE id = ?", (novo_status, id_caso))
+            conn.commit()
+        return True
+    except sqlite3.Error as e:
+        print(f"Erro ao atualizar status do relatório: {e}")
+        return False
+
+def aprovar_relatorio_com_nota(id_caso, notas):
+    try:
+        with get_db_conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE casos SET status = ?, notas_revisao = ? WHERE id = ?", ('Aprovado', notas, id_caso))
+            conn.commit()
+        return True
+    except sqlite3.Error as e:
+        print(f"Erro ao aprovar relatório: {e}")
+        return False
+
+def rejeitar_relatorio_com_nota(id_caso, notas):
+    try:
+        with get_db_conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE casos SET status = ?, notas_revisao = ? WHERE id = ?", ('Em Elaboração', notas, id_caso))
+            conn.commit()
+        return True
+    except sqlite3.Error as e:
+        print(f"Erro ao rejeitar relatório: {e}")
+        return False
 
 def salvar_atividade(dados_atividade):
     with get_db_conn() as conn:
@@ -249,7 +288,7 @@ def adicionar_caso_exemplo():
         cursor = conn.cursor()
         cursor.execute("SELECT id FROM casos")
         if cursor.fetchone() is None:
-            adicionar_novo_caso('PRIMEIRO RELATÓRIO DO ANO', 'Auditoria', date.today().strftime("%Y-%m-%d"), 'ABERTO')
+            adicionar_novo_caso('PRIMEIRO RELATÓRIO DO ANO', 'Auditoria', date.today().strftime("%Y-%m-%d"), 'Em Elaboração')
 
 def adicionar_atividade_exemplo():
     with get_db_conn() as conn:
@@ -269,10 +308,61 @@ def adicionar_atividade_exemplo():
             }
             salvar_atividade(dados_ativ)
 
+def buscar_atividade_por_id(id_atividade):
+    with get_db_conn() as conn:
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        query = """
+            SELECT 
+                ativ.*, 
+                user.nome_completo as realizado_por_nome
+            FROM 
+                atividades as ativ
+            LEFT JOIN 
+                usuarios as user ON ativ.realizado_por_id = user.id
+            WHERE 
+                ativ.id = ?
+        """
+        cursor.execute(query, (id_atividade,))
+        resultado = cursor.fetchone()
+        return dict(resultado) if resultado else None
+    
+def atualizar_atividade(id_atividade, dados):
+    # Pega apenas as chaves (nomes dos campos) que foram realmente enviadas no dicionário 'dados'
+    campos_para_atualizar = list(dados.keys())
+    
+    # Monta a cláusula SET dinamicamente, apenas com os campos recebidos
+    # Ex: "atividade_desc = ?, testes_realizados = ?"
+    set_clause = ", ".join([f"{campo} = ?" for campo in campos_para_atualizar])
+    
+    # A query final fica mais simples e flexível
+    query = f"UPDATE atividades SET {set_clause} WHERE id = ?"
+    
+    # Pega os valores dos campos na ordem correta e adiciona o ID no final
+    params = list(dados.values())
+    params.append(id_atividade)
+    
+    try:
+        with get_db_conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute(query, tuple(params))
+            conn.commit()
+        return True
+    except sqlite3.Error as e:
+        print(f"Erro ao atualizar atividade: {e}")
+        return False
+
+
 if __name__ == '__main__':
+    if os.path.exists(DB_NAME):
+        os.remove(DB_NAME)
+        print("Banco de dados antigo removido.")
+
     inicializar_banco()
-    adicionar_usuario("28685", "KAIQUE RAFAEL DOS SANTOS OLIVEIRA", "kaique.santos", "senha123", "Admin")
-    adicionar_usuario("12345", "MARCOS VINICIUS DAMASCENO", "marcos.vinicius", "outrasenha", "Auditor")
+    
+    adicionar_usuario("28685", "KAIQUE RAFAEL DOS SANTOS OLIVEIRA", "kaique.santos", "senha123", "Admin", gerente_id=None)
+    adicionar_usuario("12345", "MARCOS VINICIUS DAMASCENO", "marcos.vinicius", "outrasenha", "Auditor", gerente_id=1)
+    
     adicionar_caso_exemplo()
     adicionar_atividade_exemplo()
-    print("Banco de dados inicializado com dados de exemplo.")
+    print("Banco de dados inicializado com dados de exemplo e hierarquia.")

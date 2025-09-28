@@ -1,4 +1,6 @@
-/* static/css/style.css */
+/* =================================== */
+/* ==== ESTILOS GERAIS EXISTENTES ==== */
+/* =================================== */
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -155,7 +157,6 @@ input[type="submit"]:hover {
     text-decoration: none;
 }
 
-/* Estilo para links que devem parecer botões */
 .button-like {
     background-color: #005a9c;
     color: white;
@@ -174,8 +175,75 @@ input[type="submit"]:hover {
     text-decoration: none;
 }
 
-/* Estilo para campos que são apenas de leitura */
 .readonly-input {
-    background-color: #e9ecef; /* Um cinza claro para indicar que não é editável */
+    background-color: #e9ecef;
     cursor: not-allowed;
+}
+
+
+/* =================================== */
+/* ===== NOVOS ESTILOS PARA LOGIN ==== */
+/* =================================== */
+
+/* Estilo aplicado APENAS no body da página de login */
+body.login-body {
+    background-image: url('../images/background.jpg');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0; /* Remove o padding padrão do body geral */
+}
+
+/* O container padrão não se aplica na tela de login */
+.login-body .container {
+    max-width: none;
+    margin: 0;
+    background-color: transparent;
+    padding: 0;
+    box-shadow: none;
+}
+
+/* Estilo para o card de login com efeito "vidro" */
+.login-card {
+    background-color: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 1rem;
+    padding: 2rem;
+}
+
+/* Deixa o texto do placeholder mais claro para combinar com o fundo */
+.login-card .form-control::placeholder {
+    color: #d1d1d1;
+}
+
+/* Remove o fundo padrão do input quando autocompletado pelo navegador */
+.login-card .form-control:-webkit-autofill,
+.login-card .form-control:-webkit-autofill:hover,
+.login-card .form-control:-webkit-autofill:focus,
+.login-card .form-control:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 30px #444 inset !important;
+    -webkit-text-fill-color: #fff !important;
+}
+
+/* Estilo para o ícone dentro do campo de input */
+.login-card .input-group-text {
+    background-color: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+}
+
+/* =================================== */
+/* ====== AJUSTES PÓS-NAVBAR ======= */
+/* =================================== */
+
+/* Remove a margem superior do container principal quando a página NÃO é a de login,
+   pois a navbar agora já provê um espaçamento com sua margem inferior. */
+body:not(.login-body) .container {
+    margin-top: 0;
 }

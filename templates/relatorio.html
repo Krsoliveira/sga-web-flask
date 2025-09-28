@@ -1,123 +1,119 @@
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-    <meta charset="UTF-8">
-    <title>SGA - Detalhes do Relatório</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-</head>
-<body>
-    <div class="container">
-        <h1>Detalhes do Relatório: {{ caso.titulo }}</h1>
-        <a href="{{ url_for('dashboard') }}"><< Voltar para o Dashboard</a>
-        <hr>
+{% extends "base.html" %}
 
-        <h2>Cabeçalho</h2>
-        <p>
-            <strong>Nº Relatório:</strong> {{ caso.numero_relatorio }} <br>
-            <strong>Situação:</strong> {{ caso.status }} <br>
-            <strong>Período:</strong> de {{ caso.data_inicio }} até {{ caso.data_final or '...' }}
-        </p>
-        <hr>
-        
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="flash-{{ category }}">{{ message }}</div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
+{% block title %}Relatório {{ caso.numero_relatorio }}{% endblock %}
 
-        <h2>{% if atividade_edicao %}Editando Atividade nº {{ atividade_edicao.id }}{% else %}Adicionar Nova Atividade{% endif %}</h2>
-        
-        <form action="{{ url_for('salvar_atividade_rota', id_caso=caso.id) }}" method="POST">
-            <input type="hidden" name="id_atividade" value="{{ atividade_edicao.id if atividade_edicao }}">
-            
-            <div class="form-grid">
-                <label for="atividade_desc" class="span-all">Atividade:</label>
-                <select id="atividade_desc" name="atividade_desc" class="span-all" required>
-                    <option value="">Selecione uma atividade...</option>
-                    {% for atividade in opcoes_atividade %}
-                        <option value="{{ atividade }}" {% if atividade_edicao and atividade_edicao.atividade_desc == atividade %}selected{% endif %}>
-                            {{ atividade }}
-                        </option>
-                    {% endfor %}
-                </select>
+{% from "_macros.html" import render_breadcrumb %}
 
-                <label for="testes_realizados" class="span-all">Testes Realizados:</label>
-                <input type="text" id="testes_realizados" name="testes_realizados" class="span-all" value="{{ atividade_edicao.testes_realizados if atividade_edicao }}">
+{% block breadcrumb %}
+    {% set breadcrumb_items = [
+        {'url': url_for('dashboard'), 'text': 'Dashboard'},
+        {'url': '#', 'text': 'Relatório ' ~ caso.numero_relatorio, 'active': True}
+    ] %}
+    {{ render_breadcrumb(breadcrumb_items) }}
+    <hr class="mt-0 mb-4">
+{% endblock %}
 
-                <label for="extensao_exames">Extensão dos Exames:</label>
-                <input type="text" id="extensao_exames" name="extensao_exames" value="{{ atividade_edicao.extensao_exames if atividade_edicao }}">
 
-                <label for="criterio_amostragem">Critério da Amostragem:</label>
-                <input type="text" id="criterio_amostragem" name="criterio_amostragem" value="{{ atividade_edicao.criterio_amostragem if atividade_edicao }}">
-
-                <label for="periodo_inicio">Período - De:</label>
-                <input type="date" id="periodo_inicio" name="periodo_inicio" value="{{ atividade_edicao.periodo_inicio if atividade_edicao }}">
-
-                <label for="periodo_fim">Período - Até:</label>
-                <input type="date" id="periodo_fim" name="periodo_fim" value="{{ atividade_edicao.periodo_fim if atividade_edicao }}">
-
-                <label for="situacao">Situação da Atividade:</label>
-                <select id="situacao" name="situacao">
-                    <option value="">Selecione...</option>
-                    {% for situacao in opcoes_situacao %}
-                        <option value="{{ situacao }}" {% if atividade_edicao and atividade_edicao.situacao == situacao %}selected{% endif %}>
-                            {{ situacao }}
-                        </option>
-                    {% endfor %}
-                </select>
-
-                <label for="observacao_resumo" class="span-all">Observação / Resumo:</label>
-                <input type="text" id="observacao_resumo" name="observacao_resumo" class="span-all" value="{{ atividade_edicao.observacao_resumo if atividade_edicao }}">
-            </div>
-
-            <div class="form-actions">
-                <input type="submit" value="Salvar Atividade">
-                {% if atividade_edicao %}
-                    <a href="{{ url_for('ver_relatorio', id_caso=caso.id) }}" class="cancel-button">Cancelar Edição</a>
-                {% endif %}
-            </div>
-        </form>
-        <hr>
-
-        <h2>Atividades Registradas</h2>
-        <table>
-            <thead>
-                <tr>
-                    <th>Nº</th>
-                    <th>Atividade</th>
-                    <th>Realizado Por</th>
-                    <th>Observação / Resumo</th>
-                    <th>Situação</th>
-                    <th style="text-align: center;">Ações</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for ativ in atividades %}
-                <tr>
-                    <td>{{ ativ.id }}</td>
-                    <td>{{ ativ.atividade_desc }}</td>
-                    <td>{{ ativ.realizado_por_nome or 'Usuário não encontrado' }}</td>
-                    <td>{{ ativ.observacao_resumo }}</td>
-                    <td>{{ ativ.situacao }}</td>
-                    <td>
-                        <div class="action-links">
-                            <a href="{{ url_for('ver_relatorio', id_caso=caso.id, editar=ativ.id) }}">Editar</a>
-                            <form action="{{ url_for('deletar_atividade_rota', id_atividade=ativ.id) }}" method="POST">
-                                <input type="hidden" name="id_caso" value="{{ caso.id }}">
-                                <button type="submit" class="delete-button" onclick="return confirm('Tem certeza?');">Deletar</button>
-                            </form>
-                        </div>
-                    </td>
-                </tr>
-                {% else %}
-                <tr>
-                    <td colspan="6" style="text-align: center;">Nenhuma atividade registrada.</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+{% block content %}
+    {# ... (Cabeçalho, Menu Pills e Conteúdo das Abas - Nenhuma alteração aqui) ... #}
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div><h1 class="h3 mb-1">{{ caso.titulo }}</h1><span class="text-muted">Relatório Nº: {{ caso.numero_relatorio }}</span></div>
+        <div><span class="badge {% if caso.status == 'Aprovado' %} bg-success {% elif caso.status == 'Pendente de Revisão' %} bg-warning {% elif caso.status == 'Em Elaboração' %} bg-info {% else %} bg-secondary {% endif %} fs-6">{{ caso.status }}</span></div>
     </div>
-</body>
-</html>
+    <ul class="nav nav-pills mb-4" id="pills-tab" role="tablist">
+        <li class="nav-item" role="presentation"><button class="nav-link active" id="pills-geral-tab" data-bs-toggle="pill" data-bs-target="#pills-geral" type="button" role="tab" aria-controls="pills-geral" aria-selected="true">Visão Geral</button></li>
+        <li class="nav-item" role="presentation"><button class="nav-link" id="pills-atividades-tab" data-bs-toggle="pill" data-bs-target="#pills-atividades" type="button" role="tab" aria-controls="pills-atividades" aria-selected="false">Atividades</button></li>
+        <li class="nav-item" role="presentation"><button class="nav-link disabled" id="pills-anexos-tab" data-bs-toggle="pill" data-bs-target="#pills-anexos" type="button" role="tab" aria-controls="pills-anexos" aria-selected="false">Anexos</button></li>
+        <li class="nav-item" role="presentation"><button class="nav-link disabled" id="pills-historico-tab" data-bs-toggle="pill" data-bs-target="#pills-historico" type="button" role="tab" aria-controls="pills-historico" aria-selected="false">Histórico</button></li>
+    </ul>
+    <div class="tab-content" id="pills-tabContent">
+        <div class="tab-pane fade show active" id="pills-geral" role="tabpanel" aria-labelledby="pills-geral-tab">
+            <div class="card"><div class="card-header">Detalhes do Relatório</div><div class="card-body"><p><strong>Tipo:</strong> {{ caso.tipo }}</p><p><strong>Data de Início:</strong> {{ caso.data_inicio }}</p><p><strong>Status:</strong> {{ caso.status }}</p>{% if caso.notas_revisao %}<p class="mb-0"><strong>Notas da Última Revisão:</strong></p><div class="alert alert-info">{{ caso.notas_revisao }}</div>{% endif %}</div></div>
+        </div>
+        <div class="tab-pane fade" id="pills-atividades" role="tabpanel" aria-labelledby="pills-atividades-tab">
+            <div class="card"><div class="card-header"><h5 class="mb-0">Registrar Nova Atividade</h5></div><div class="card-body"><form action="{{ url_for('adicionar_atividade', id_caso=caso.id) }}" method="POST"><div class="mb-3"><label for="atividade_desc" class="form-label">Descrição da Atividade (Ponto de Auditoria)</label><select class="form-select" id="atividade_desc" name="atividade_desc" required><option selected disabled value="">Selecione um ponto de auditoria...</option>{% for opcao in opcoes_atividade %}<option value="{{ opcao }}">{{ opcao }}</option>{% endfor %}</select></div><div class="mb-3"><label for="testes_realizados" class="form-label">Testes Realizados</label><textarea class="form-control" id="testes_realizados" name="testes_realizados" rows="3" required></textarea></div><div class="mb-3"><label for="observacao_resumo" class="form-label">Observação / Resumo dos Achados</label><textarea class="form-control" id="observacao_resumo" name="observacao_resumo" rows="3"></textarea></div><div class="row"><div class="col-md-6 mb-3"><label for="nao_conformidade" class="form-label">Não Conformidade (Opcional)</label><input type="text" class="form-control" id="nao_conformidade" name="nao_conformidade"></div><div class="col-md-6 mb-3"><label for="situacao" class="form-label">Situação</label><select class="form-select" id="situacao" name="situacao" required>{% for opcao in opcoes_situacao %}<option value="{{ opcao }}">{{ opcao }}</option>{% endfor %}</select></div></div><div class="mb-3"><label for="recomendacao" class="form-label">Recomendação (Opcional)</label><textarea class="form-control" id="recomendacao" name="recomendacao" rows="2"></textarea></div><button type="submit" class="btn btn-primary">Salvar Atividade</button></form></div></div>
+            <div class="card mt-4">
+                <div class="card-header">Atividades Registradas</div>
+                <div class="card-body">
+                    {% if atividades %}<div class="list-group">{% for atividade in atividades %}<button type="button" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center view-activity-btn" data-activity-id="{{ atividade.id }}"><div><strong class="mb-1">{{ atividade.atividade_desc }}</strong><p class="mb-1 small text-muted">Realizado por: {{ atividade.realizado_por_nome }}</p></div><span class="badge bg-primary rounded-pill">{{ atividade.situacao }}</span></button>{% endfor %}</div>{% else %}<p class="text-center">Nenhuma atividade registrada para este relatório ainda.</p>{% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="activityDetailModal" tabindex="-1" aria-labelledby="activityDetailModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="activityDetailModalLabel">Detalhes da Atividade</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><p><strong>Ponto de Auditoria:</strong> <span id="modal-atividade_desc"></span></p><p><strong>Testes Realizados:</strong></p><pre id="modal-testes_realizados"></pre><p><strong>Observação / Resumo:</strong></p><pre id="modal-observacao_resumo"></pre><hr><p><strong>Não Conformidade:</strong> <span id="modal-nao_conformidade"></span></p><p><strong>Recomendação:</strong> <span id="modal-recomendacao"></span></p><hr><div class="row"><div class="col"><strong>Situação:</strong> <span id="modal-situacao" class="badge"></span></div><div class="col"><strong>Realizado por:</strong> <span id="modal-realizado_por_nome"></span></div></div></div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                    <button type="button" class="btn btn-primary" id="modal-edit-btn">Editar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const activityModal = new bootstrap.Modal(document.getElementById('activityDetailModal'));
+    const viewButtons = document.querySelectorAll('.view-activity-btn');
+    const editButton = document.getElementById('modal-edit-btn');
+
+    viewButtons.forEach(button => {
+        button.addEventListener('click', function () {
+            const activityId = this.dataset.activityId;
+            
+            editButton.onclick = function() {
+                window.location.href = `/atividade/${activityId}/editar`;
+            };
+
+            // Limpa todos os campos e mostra "Carregando..."
+            document.getElementById('modal-atividade_desc').textContent = 'Carregando...';
+            document.getElementById('modal-testes_realizados').textContent = '...';
+            document.getElementById('modal-observacao_resumo').textContent = '...';
+            document.getElementById('modal-nao_conformidade').textContent = '...';
+            document.getElementById('modal-recomendacao').textContent = '...';
+            document.getElementById('modal-situacao').textContent = '...';
+            document.getElementById('modal-realizado_por_nome').textContent = '...';
+
+            fetch(`/api/atividade/${activityId}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Não foi possível buscar os dados da atividade.');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Preenche o modal com os dados recebidos
+                    document.getElementById('modal-atividade_desc').textContent = data.atividade_desc || 'Não informado';
+                    document.getElementById('modal-testes_realizados').textContent = data.testes_realizados || 'Não informado';
+                    
+                    // ===================================
+                    // ==== LINHAS FALTANTES ADICIONADAS ====
+                    // ===================================
+                    document.getElementById('modal-observacao_resumo').textContent = data.observacao_resumo || 'Não informado';
+                    document.getElementById('modal-nao_conformidade').textContent = data.nao_conformidade || 'Nenhuma';
+                    document.getElementById('modal-recomendacao').textContent = data.recomendacao || 'Nenhuma';
+                    // ===================================
+
+                    document.getElementById('modal-realizado_por_nome').textContent = data.realizado_por_nome || 'Desconhecido';
+                    
+                    const situacaoBadge = document.getElementById('modal-situacao');
+                    situacaoBadge.textContent = data.situacao || 'Não informada';
+                    situacaoBadge.className = 'badge'; 
+                    if (data.situacao === 'FINALIZADO') situacaoBadge.classList.add('bg-success');
+                    else if (data.situacao === 'PENDENTE') situacaoBadge.classList.add('bg-warning');
+                    else situacaoBadge.classList.add('bg-info');
+
+                    activityModal.show();
+                })
+                .catch(error => {
+                    console.error('Erro:', error);
+                    alert('Erro ao carregar detalhes da atividade.');
+                });
+        });
+    });
+});
+</script>
+{% endblock %}

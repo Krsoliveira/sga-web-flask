@@ -36,6 +36,14 @@
                     <option value="{{ role }}">{{ role }}</option>
                 {% endfor %}
             </select>
+
+            <label for="gerente_id">Gerente Direto:</label>
+            <select id="gerente_id" name="gerente_id">
+                <option value="">Nenhum</option>
+                {% for gerente in gerentes %}
+                    <option value="{{ gerente.id }}">{{ gerente.nome_completo }}</option>
+                {% endfor %}
+            </select>
             
             <div class="form-actions" style="text-align: left; margin-top: 20px;">
                 <input type="submit" value="Criar Usuário">

@@ -1,31 +1,82 @@
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-    <meta charset="UTF-8">
-    <title>SGA - Login</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-</head>
-<body>
-    <div class="container">
-        <h1>Login - SGA</h1>
+{% extends "base.html" %}
 
+{% block body_class %}login-body{% endblock %}
+
+{% block title %}Login{% endblock %}
+
+{# Aqui está a mágica: estamos substituindo o bloco inteiro do conteúdo principal #}
+{% block main_content %}
+<div class="col-md-6 col-lg-5 col-xl-4">
+    <div class="login-card text-white">
+        <div class="text-center mb-4">
+            <h1 class="fw-bold">SGA</h1>
+            <p class="text-white-50">Sistema de Gestão de Auditoria</p>
+        </div>
+
+        <form action="{{ url_for('login') }}" method="POST">
+            <div class="input-group mb-3">
+                <span class="input-group-text"><i class="fas fa-user"></i></span>
+                <input type="text" id="codigo" name="codigo" class="form-control form-control-lg" placeholder="Código do Colaborador" required>
+            </div>
+
+            <div id="display-name-container" class="mb-3" style="min-height: 24px;">
+                <p id="display-name" class="form-text text-light fw-bold"></p>
+            </div>
+
+            <div class="input-group mb-4">
+                <span class="input-group-text"><i class="fas fa-lock"></i></span>
+                <input type="password" id="senha" name="senha" class="form-control form-control-lg" placeholder="Senha" required>
+            </div>
+            
+            <div class="d-grid">
+                <button type="submit" class="btn btn-primary btn-lg">Entrar</button>
+            </div>
+        </form>
+
+        {# Movendo as mensagens de flash para dentro do nosso layout customizado #}
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="flash-{{ category }}">{{ message }}</div>
+                    <div class="alert alert-{{ category }} mt-3 alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
                 {% endfor %}
             {% endif %}
         {% endwith %}
-
-        <form action="{{ url_for('login') }}" method="POST">
-            <label for="codigo">Código:</label>
-            <input type="text" id="codigo" name="codigo" required>
-            
-            <label for="senha">Senha:</label>
-            <input type="password" id="senha" name="senha" required>
-
-            <input type="submit" value="Entrar">
-        </form>
     </div>
-</body>
-</html>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const codigoInput = document.getElementById('codigo');
+        const displayNameElement = document.getElementById('display-name');
+        let typingTimer;
+        const doneTypingInterval = 500;
+        codigoInput.addEventListener('keyup', () => {
+            clearTimeout(typingTimer);
+            displayNameElement.textContent = '...';
+            typingTimer = setTimeout(fetchUserName, doneTypingInterval);
+        });
+        function fetchUserName() {
+            const codigo = codigoInput.value;
+            if (codigo.length > 0) {
+                fetch(`/api/get-user-name/${codigo}`)
+                    .then(response => {
+                        if (!response.ok) { throw new Error('Usuário não encontrado'); }
+                        return response.json();
+                    })
+                    .then(data => {
+                        displayNameElement.textContent = data.nome_completo ? data.nome_completo.toUpperCase() : '';
+                    })
+                    .catch(error => {
+                        console.error('Erro:', error);
+                        displayNameElement.textContent = '';
+                    });
+            } else {
+                displayNameElement.textContent = '';
+            }
+        }
+    });
+</script>
+{% endblock main_content %}

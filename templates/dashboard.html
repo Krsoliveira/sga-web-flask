@@ -12,7 +12,7 @@
         </form>
     </div>
 
-    <p class="text-muted">Bem-vindo(a) de volta, {{ session.get('dados_usuario').get('nome') }}.</p>
+    <p class="text-muted">Bem-vindo(a) de volta, {{ usuario.nome_completo }}.</p>
     
     <hr class="mb-4">
 
@@ -34,16 +34,17 @@
                 <td>{{ caso.titulo }}</td>
                 <td>
                     <span class="badge 
-                        {% if caso.status == 'Aprovado' %} bg-success
-                        {% elif caso.status == 'Pendente de Revisão' %} bg-warning
-                        {% elif caso.status == 'Em Elaboração' %} bg-info
-                        {% else %} bg-secondary
-                        {% endif %}">
-                        {{ caso.status }}
+                          {% if caso.status == 'Aprovado' %} bg-success
+                          {% elif caso.status == 'Pendente de Revisão' %} bg-warning
+                          {% elif caso.status == 'Em Elaboração' %} bg-info
+                          {% else %} bg-secondary
+                          {% endif %}">
+                          {{ caso.status }}
                     </span>
                 </td>
                 <td>
                     <a href="{{ url_for('ver_relatorio', id_caso=caso.id) }}" class="btn btn-sm btn-outline-primary">Abrir</a>
+                    <a href="{{ url_for('editar_relatorio', id_caso=caso.id) }}" class="btn btn-sm btn-outline-secondary">Editar</a>
                 </td>
             </tr>
             {% else %}

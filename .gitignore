@@ -1,12 +1,17 @@
-# Arquivos de ambiente
-.env
-
-# Pasta do ambiente virtual
+# Ambiente Virtual
 venv_web/
+venv/
 
-# Arquivos de cache do Python
+# Ficheiros de Cache do Python
 __pycache__/
 *.pyc
 
-# Arquivos de banco de dados
-gerenciador.db
+# Ficheiro de Segredos
+.env
+
+# Pasta de Uploads (geralmente não se versiona os ficheiros dos usuários)
+uploads/
+
+# Ficheiros de configuração de IDEs
+.vscode/
+.idea/

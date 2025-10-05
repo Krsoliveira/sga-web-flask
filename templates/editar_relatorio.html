@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}Editar Relatório{% endblock %}
+
+{% from "_macros.html" import render_breadcrumb %}
+
+{% block breadcrumb %}
+    {% set breadcrumb_items = [
+        {'url': url_for('dashboard'), 'text': 'Dashboard'},
+        {'url': url_for('ver_relatorio', id_caso=caso.id), 'text': 'Relatório ' ~ caso.numero_relatorio},
+        {'url': '#', 'text': 'Editar Detalhes', 'active': True}
+    ] %}
+    {{ render_breadcrumb(breadcrumb_items) }}
+    <hr class="mt-0 mb-4">
+{% endblock %}
+
+{% block content %}
+    <h1 class="h3 mb-4">Editar Detalhes do Relatório</h1>
+
+    <form method="POST">
+        <div class="mb-3">
+            <label for="titulo" class="form-label">Título do Relatório</label>
+            <input type="text" class="form-control" id="titulo" name="titulo" value="{{ caso.titulo }}" required>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="tipo" class="form-label">Tipo</label>
+                <input type="text" class="form-control" id="tipo" name="tipo" value="{{ caso.tipo }}" required>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label for="status" class="form-label">Status do Relatório</label>
+                <select class="form-select" id="status" name="status" required>
+                    {% for opcao in opcoes_situacao %}
+                    <option value="{{ opcao }}" {% if opcao == caso.status %}selected{% endif %}>{{ opcao }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        
+        <div class="d-flex justify-content-end">
+            <a href="{{ url_for('ver_relatorio', id_caso=caso.id) }}" class="btn btn-secondary me-2">Cancelar</a>
+            <button type="submit" class="btn btn-primary">Salvar Alterações</button>
+        </div>
+    </form>
+{% endblock %}
+

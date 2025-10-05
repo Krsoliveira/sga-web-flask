@@ -1,368 +1,307 @@
-import sqlite3
-import hashlib
-from datetime import date, datetime
-from contextlib import contextmanager
 import os
+import hashlib
+import datetime
+from dotenv import load_dotenv
+from sqlalchemy import create_engine, event, Column, Integer, String, ForeignKey, Text
+from sqlalchemy.orm import sessionmaker, declarative_base, relationship, scoped_session, joinedload
+from sqlalchemy.inspection import inspect
+from contextlib import contextmanager
 
-DB_NAME = 'gerenciador.db'
+# Carrega as variáveis de ambiente do arquivo .env
+load_dotenv()
 
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+if not DATABASE_URL:
+    raise ValueError("A variável de ambiente DATABASE_URL não foi definida.")
+
+# --- Configuração do SQLAlchemy ---
+engine = create_engine(DATABASE_URL)
+session_factory = sessionmaker(autocommit=False, autoflush=False, bind=engine, expire_on_commit=False)
+ScopedSession = scoped_session(session_factory)
+
+Base = declarative_base()
+
+# --- FUNÇÃO HELPER PARA CONVERSÃO ---
+def object_as_dict(obj):
+    """Converte um objeto SQLAlchemy para um dicionário."""
+    return {c.key: getattr(obj, c.key)
+            for c in inspect(obj).mapper.column_attrs}
+
+# --- Modelos de Tabela ---
+class Usuario(Base):
+    __tablename__ = 'usuarios'
+    id = Column(Integer, primary_key=True)
+    codigo = Column(String(50), unique=True, nullable=False)
+    nome_completo = Column(String(255), nullable=False)
+    username = Column(String(100), unique=True, nullable=False)
+    password_hash = Column(String(255), nullable=False)
+    role = Column(String(50), nullable=False, default='Auditor')
+    gerente_id = Column(Integer, ForeignKey('usuarios.id'))
+    
+    atividades_realizadas = relationship("Atividade", back_populates="realizado_por")
+
+class Caso(Base):
+    __tablename__ = 'casos'
+    id = Column(Integer, primary_key=True)
+    titulo = Column(String(255), nullable=False)
+    numero_relatorio = Column(String(50), unique=True)
+    tipo = Column(String(100), nullable=False)
+    data_inicio = Column(String(20), nullable=False)
+    data_final = Column(String(20))
+    status = Column(String(50), nullable=False)
+    notas_revisao = Column(Text)
+    categoria_id = Column(Integer, ForeignKey('categorias.id'))
+    
+    atividades = relationship("Atividade", back_populates="caso", cascade="all, delete-orphan")
+    anexos = relationship("Anexo", back_populates="caso", cascade="all, delete-orphan")
+    categoria = relationship("Categoria", back_populates="casos")
+
+class Atividade(Base):
+    __tablename__ = 'atividades'
+    id = Column(Integer, primary_key=True)
+    caso_id = Column(Integer, ForeignKey('casos.id'), nullable=False)
+    atividade_desc = Column(Text)
+    testes_realizados = Column(Text)
+    observacao_resumo = Column(Text)
+    nao_conformidade = Column(Text)
+    recomendacao = Column(Text)
+    data_registro = Column(String(20), nullable=False)
+    situacao = Column(String(50))
+    realizado_por_id = Column(Integer, ForeignKey('usuarios.id'))
+    
+    caso = relationship("Caso", back_populates="atividades")
+    realizado_por = relationship("Usuario", back_populates="atividades_realizadas")
+
+# --- Funções de Acesso ao Banco de Dados ---
 @contextmanager
-def get_db_conn():
-    """
-    Gerenciador de contexto para conexões com o banco de dados.
-    Garante que a conexão seja sempre fechada de forma segura.
-    """
-    conn = None
+def get_db():
+    session = ScopedSession()
     try:
-        conn = sqlite3.connect(DB_NAME)
-        yield conn
-    except sqlite3.Error as e:
-        print(f"Erro de banco de dados: {e}")
+        yield session
+        session.commit()
+    except:
+        session.rollback()
         raise
     finally:
-        if conn:
-            conn.close()
+        ScopedSession.remove()
 
 def inicializar_banco():
-    """Cria e inicializa o banco de dados e suas tabelas se não existirem."""
-    with get_db_conn() as conn:
-        cursor = conn.cursor()
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS usuarios (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            codigo TEXT UNIQUE NOT NULL,
-            nome_completo TEXT NOT NULL,
-            username TEXT UNIQUE NOT NULL, 
-            password_hash TEXT NOT NULL,
-            role TEXT NOT NULL DEFAULT 'Auditor',
-            gerente_id INTEGER,
-            FOREIGN KEY (gerente_id) REFERENCES usuarios (id)
-        )''')
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS casos (
-            id INTEGER PRIMARY KEY AUTOINCREMENT, titulo TEXT NOT NULL, numero_relatorio TEXT UNIQUE,
-            tipo TEXT NOT NULL, data_inicio TEXT NOT NULL, data_final TEXT, 
-            status TEXT NOT NULL, notas_revisao TEXT
-        )''')
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS atividades (
-            id INTEGER PRIMARY KEY AUTOINCREMENT, caso_id INTEGER NOT NULL, atividade_desc TEXT,
-            testes_realizados TEXT, extensao_exames TEXT, criterio_amostragem TEXT,
-            periodo_inicio TEXT,
-            periodo_fim TEXT,
-            observacao_resumo TEXT, 
-            realizado_por_id INTEGER,
-            ultima_modificacao_por_id INTEGER,
-            nao_conformidade TEXT, reincidente INTEGER, recomendacao TEXT,
-            data_p_solucao TEXT, data_registro TEXT NOT NULL, situacao TEXT,
-            FOREIGN KEY (caso_id) REFERENCES casos (id) ON DELETE CASCADE,
-            FOREIGN KEY (realizado_por_id) REFERENCES usuarios (id)
-        )''')
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS log_exclusoes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT, id_caso_excluido INTEGER NOT NULL,
-            numero_relatorio_excluido TEXT, titulo_excluido TEXT,
-            usuario_codigo TEXT NOT NULL, usuario_nome TEXT NOT NULL, data_exclusao TEXT NOT NULL
-        )''')
-        conn.commit()
-        cursor.execute("PRAGMA foreign_keys = ON;")
+    print(f"Tentando conectar ao banco de dados com a URL: {DATABASE_URL.split('@')[-1]}")
+    print("Inicializando o banco de dados e criando tabelas...")
+    Base.metadata.create_all(bind=engine)
+    print("Tabelas criadas com sucesso (se não existiam).")
 
-def adicionar_usuario(codigo, nome_completo, username, senha, role, gerente_id=None):
+def verificar_login(sess, codigo_usuario, senha):
+    senha_hash = hashlib.sha256(senha.encode()).hexdigest()
+    # CORREÇÃO FINAL: Usando 'codigo', que é o nome correto do campo no modelo.
+    usuario = sess.query(Usuario).filter_by(codigo=codigo_usuario, password_hash=senha_hash).first()
+    return object_as_dict(usuario) if usuario else None
+
+def buscar_usuario_por_codigo(sess, codigo_usuario):
+    # CORREÇÃO FINAL: Usando 'codigo', que é o nome correto do campo no modelo.
+    usuario_obj = sess.query(Usuario).filter_by(codigo=codigo_usuario).first()
+    return object_as_dict(usuario_obj) if usuario_obj else None
+
+def adicionar_usuario(sess, dados):
     try:
-        with get_db_conn() as conn:
-            cursor = conn.cursor()
-            senha_hash = hashlib.sha256(senha.encode()).hexdigest()
-            cursor.execute('INSERT INTO usuarios (codigo, nome_completo, username, password_hash, role, gerente_id) VALUES (?, ?, ?, ?, ?, ?)', 
-                           (codigo, nome_completo, username, senha_hash, role, gerente_id))
-            conn.commit()
+        nome = dados['nome_completo'].lower().split()
+        username = f"{nome[0]}.{nome[-1]}" if len(nome) > 1 else nome[0]
+        novo_usuario = Usuario(
+            codigo=dados['codigo'],
+            nome_completo=dados['nome_completo'],
+            username=username,
+            password_hash=hashlib.sha256(dados['senha'].encode()).hexdigest(),
+            role=dados['role'],
+            gerente_id=dados.get('gerente_id')
+        )
+        sess.add(novo_usuario)
         return True
-    except sqlite3.IntegrityError:
-        print(f"Erro: Usuário com código '{codigo}' ou username '{username}' já existe.")
+    except Exception:
+        sess.rollback()
         return False
 
-def verificar_login(codigo, senha):
-    with get_db_conn() as conn:
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, codigo, nome_completo, password_hash, role FROM usuarios WHERE codigo = ?", (codigo,))
-        usuario = cursor.fetchone()
-        if usuario:
-            senha_digitada_hash = hashlib.sha256(senha.encode()).hexdigest()
-            if senha_digitada_hash == usuario['password_hash']:
-                return {
-                    'id': usuario['id'],
-                    'codigo': usuario['codigo'],
-                    'nome': usuario['nome_completo'],
-                    'role': usuario['role']
-                }
-    return None
+def buscar_casos(sess):
+    return sess.query(Caso).order_by(Caso.id.desc()).all()
 
-def buscar_usuario_por_codigo(codigo):
-    with get_db_conn() as conn:
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        cursor.execute("SELECT nome_completo FROM usuarios WHERE codigo = ?", (codigo,))
-        usuario = cursor.fetchone()
-        return dict(usuario) if usuario else None
-
-def buscar_todos_usuarios():
-    with get_db_conn() as conn:
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, codigo, nome_completo, username, role, gerente_id FROM usuarios ORDER BY nome_completo")
-        return [dict(row) for row in cursor.fetchall()]
-
-def buscar_usuario_por_id(user_id):
-    with get_db_conn() as conn:
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM usuarios WHERE id = ?", (user_id,))
-        usuario = cursor.fetchone()
-        return dict(usuario) if usuario else None
-
-def atualizar_usuario(user_id, dados):
-    query = "UPDATE usuarios SET codigo = ?, nome_completo = ?, username = ?, role = ?, gerente_id = ?"
-    params = [dados['codigo'], dados['nome_completo'], dados['username'], dados['role'], dados['gerente_id']]
-    if dados.get('nova_senha'):
-        nova_senha_hash = hashlib.sha256(dados['nova_senha'].encode()).hexdigest()
-        query += ", password_hash = ?"
-        params.append(nova_senha_hash)
-    query += " WHERE id = ?"
-    params.append(user_id)
+def adicionar_novo_caso(sess, titulo, tipo, data_inicio, status):
     try:
-        with get_db_conn() as conn:
-            cursor = conn.cursor()
-            cursor.execute(query, tuple(params))
-            conn.commit()
+        timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S%f")
+        numero_temporario = f"REL-{timestamp}"
+        novo_caso = Caso(
+            titulo=titulo,
+            numero_relatorio=numero_temporario,
+            tipo=tipo,
+            data_inicio=str(data_inicio),
+            status=status
+        )
+        sess.add(novo_caso)
+        sess.flush()
+        return novo_caso.id
+    except Exception as e:
+        print(f"ERRO em adicionar_novo_caso: {e}")
+        return None
+
+def buscar_caso_por_id(sess, caso_id):
+    return sess.query(Caso).options(
+        # Carrega as atividades e os seus usuários
+        joinedload(Caso.atividades).joinedload(Atividade.realizado_por),
+        # ADICIONE ESTA LINHA: Carrega também os anexos
+        joinedload(Caso.anexos)
+    ).filter_by(id=caso_id).first()
+
+def salvar_atividade(sess, dados_da_atividade):
+    try:
+        nova_atividade = Atividade(**dados_da_atividade)
+        sess.add(nova_atividade)
         return True
-    except sqlite3.IntegrityError:
+    except Exception as e:
+        print(f"ERRO ao salvar atividade: {e}")
         return False
 
-def deletar_relatorio_e_registrar_log(id_caso, usuario_codigo, usuario_nome):
-    try:
-        with get_db_conn() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT numero_relatorio, titulo FROM casos WHERE id = ?", (id_caso,))
-            dados_caso = cursor.fetchone()
-            if not dados_caso: return False
-            num_relatorio, titulo = dados_caso
-            data_hora_agora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            cursor.execute("INSERT INTO log_exclusoes (id_caso_excluido, numero_relatorio_excluido, titulo_excluido, usuario_codigo, usuario_nome, data_exclusao) VALUES (?, ?, ?, ?, ?, ?)",
-                           (id_caso, num_relatorio, titulo, usuario_codigo, usuario_nome, data_hora_agora))
-            cursor.execute("DELETE FROM casos WHERE id = ?", (id_caso,))
-            conn.commit()
-        return True
-    except sqlite3.Error as e:
-        print(f"Ocorreu um erro na exclusão segura: {e}")
-        return False
+def buscar_atividade_por_id(sess, atividade_id):
+    return sess.query(Atividade).options(
+        joinedload(Atividade.realizado_por)
+    ).filter_by(id=atividade_id).first()
 
-def buscar_casos():
-    with get_db_conn() as conn:
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM casos ORDER BY data_inicio DESC")
-        return [dict(row) for row in cursor.fetchall()]
+# Adicione estas duas novas classes ao seu database.py
 
-def adicionar_novo_caso(titulo, tipo, data_inicio, status):
-    with get_db_conn() as conn:
-        cursor = conn.cursor()
-        ano_atual = date.today().year
-        cursor.execute("SELECT numero_relatorio FROM casos WHERE numero_relatorio LIKE ? ORDER BY numero_relatorio DESC LIMIT 1", (f"{ano_atual}.%",))
-        resultado = cursor.fetchone()
-        ultimo_num = int(resultado[0].split('.')[1]) if resultado else 0
-        numero_relatorio_gerado = f"{ano_atual}.{ultimo_num + 1:03d}"
-        cursor.execute("INSERT INTO casos (titulo, tipo, data_inicio, status, numero_relatorio) VALUES (?, ?, ?, ?, ?)",
-                       (titulo, tipo, data_inicio, status, numero_relatorio_gerado))
-        conn.commit()
-        return cursor.lastrowid
+class Categoria(Base):
+    __tablename__ = 'categorias'
+    id = Column(Integer, primary_key=True)
+    nome = Column(String(100), unique=True, nullable=False)
 
-def buscar_caso_por_id(id_caso):
-    with get_db_conn() as conn:
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM casos WHERE id = ?", (id_caso,))
-        resultado = cursor.fetchone()
-        return dict(resultado) if resultado else None
+    # Relacionamentos
+    atividades_padrao = relationship("AtividadePadrao", back_populates="categoria", cascade="all, delete-orphan")
+    casos = relationship("Caso", back_populates="categoria")
 
-def atualizar_status_relatorio(id_caso, novo_status):
-    try:
-        with get_db_conn() as conn:
-            cursor = conn.cursor()
-            cursor.execute("UPDATE casos SET status = ? WHERE id = ?", (novo_status, id_caso))
-            conn.commit()
-        return True
-    except sqlite3.Error as e:
-        print(f"Erro ao atualizar status do relatório: {e}")
-        return False
-
-def aprovar_relatorio_com_nota(id_caso, notas):
-    try:
-        with get_db_conn() as conn:
-            cursor = conn.cursor()
-            cursor.execute("UPDATE casos SET status = ?, notas_revisao = ? WHERE id = ?", ('Aprovado', notas, id_caso))
-            conn.commit()
-        return True
-    except sqlite3.Error as e:
-        print(f"Erro ao aprovar relatório: {e}")
-        return False
-
-def rejeitar_relatorio_com_nota(id_caso, notas):
-    try:
-        with get_db_conn() as conn:
-            cursor = conn.cursor()
-            cursor.execute("UPDATE casos SET status = ?, notas_revisao = ? WHERE id = ?", ('Em Elaboração', notas, id_caso))
-            conn.commit()
-        return True
-    except sqlite3.Error as e:
-        print(f"Erro ao rejeitar relatório: {e}")
-        return False
-
-def salvar_atividade(dados_atividade):
-    with get_db_conn() as conn:
-        cursor = conn.cursor()
-        cursor.execute("""
-            INSERT INTO atividades (caso_id, atividade_desc, testes_realizados, extensao_exames, 
-                                  criterio_amostragem, periodo_inicio, periodo_fim, observacao_resumo, 
-                                  realizado_por_id, nao_conformidade, reincidente, recomendacao, 
-                                  data_p_solucao, data_registro, situacao) 
-            VALUES (:caso_id, :atividade_desc, :testes_realizados, :extensao_exames, 
-                    :criterio_amostragem, :periodo_inicio, :periodo_fim, :observacao_resumo, 
-                    :realizado_por_id, :nao_conformidade, :reincidente, :recomendacao, 
-                    :data_p_solucao, :data_registro, :situacao)
-        """, dados_atividade)
-        conn.commit()
-    return True
-
-def buscar_atividade_por_id(id_atividade):
-    with get_db_conn() as conn:
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM atividades WHERE id = ?", (id_atividade,))
-        atividade = cursor.fetchone()
-        return dict(atividade) if atividade else None
-
-def atualizar_atividade(id_atividade, dados_atividade):
-    with get_db_conn() as conn:
-        cursor = conn.cursor()
-        query = """
-            UPDATE atividades SET 
-                atividade_desc = :atividade_desc, testes_realizados = :testes_realizados, 
-                observacao_resumo = :observacao_resumo, extensao_exames = :extensao_exames, 
-                criterio_amostragem = :criterio_amostragem, periodo_inicio = :periodo_inicio, 
-                periodo_fim = :periodo_fim, situacao = :situacao 
-            WHERE id = :id
-        """
-        cursor.execute(query, {**dados_atividade, 'id': id_atividade})
-        conn.commit()
-    return True
-
-def deletar_atividade_por_id(id_atividade):
-    with get_db_conn() as conn:
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM atividades WHERE id = ?", (id_atividade,))
-        conn.commit()
-    return True
-
-def buscar_atividades_completas_por_caso_id(id_caso):
-    with get_db_conn() as conn:
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        query = """
-            SELECT 
-                ativ.*, 
-                user.nome_completo as realizado_por_nome
-            FROM 
-                atividades as ativ
-            LEFT JOIN 
-                usuarios as user ON ativ.realizado_por_id = user.id
-            WHERE 
-                ativ.caso_id = ? 
-            ORDER BY 
-                ativ.id
-        """
-        cursor.execute(query, (id_caso,))
-        return [dict(row) for row in cursor.fetchall()]
-
-def adicionar_caso_exemplo():
-    with get_db_conn() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT id FROM casos")
-        if cursor.fetchone() is None:
-            adicionar_novo_caso('PRIMEIRO RELATÓRIO DO ANO', 'Auditoria', date.today().strftime("%Y-%m-%d"), 'Em Elaboração')
-
-def adicionar_atividade_exemplo():
-    with get_db_conn() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT id FROM atividades WHERE caso_id = ?", (1,))
-        if cursor.fetchone() is None:
-            dados_ativ = {
-                "caso_id": 1, 
-                "realizado_por_id": 1,
-                "data_registro": date.today().strftime("%Y-%m-%d"),
-                "atividade_desc": "Coleta de amostras para classificação", "testes_realizados": "Verificação do processo de coleta de amostras de 12 veículos.",
-                "extensao_exames": "12 veículos", "criterio_amostragem": "Descargas analisadas no sistema de câmeras da unidade",
-                "periodo_inicio": "2025-08-18",
-                "periodo_fim": "2025-08-20",
-                "situacao": "FINALIZADO", "observacao_resumo": "Sem irregularidades.",
-                "nao_conformidade": "", "reincidente": 0, "recomendacao": "", "data_p_solucao": ""
-            }
-            salvar_atividade(dados_ativ)
-
-def buscar_atividade_por_id(id_atividade):
-    with get_db_conn() as conn:
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        query = """
-            SELECT 
-                ativ.*, 
-                user.nome_completo as realizado_por_nome
-            FROM 
-                atividades as ativ
-            LEFT JOIN 
-                usuarios as user ON ativ.realizado_por_id = user.id
-            WHERE 
-                ativ.id = ?
-        """
-        cursor.execute(query, (id_atividade,))
-        resultado = cursor.fetchone()
-        return dict(resultado) if resultado else None
+class AtividadePadrao(Base):
+    __tablename__ = 'atividades_padrao'
+    id = Column(Integer, primary_key=True)
+    descricao = Column(Text, nullable=False)
     
-def atualizar_atividade(id_atividade, dados):
-    # Pega apenas as chaves (nomes dos campos) que foram realmente enviadas no dicionário 'dados'
-    campos_para_atualizar = list(dados.keys())
+    # Chave estrangeira para ligar à categoria
+    categoria_id = Column(Integer, ForeignKey('categorias.id'), nullable=False)
     
-    # Monta a cláusula SET dinamicamente, apenas com os campos recebidos
-    # Ex: "atividade_desc = ?, testes_realizados = ?"
-    set_clause = ", ".join([f"{campo} = ?" for campo in campos_para_atualizar])
-    
-    # A query final fica mais simples e flexível
-    query = f"UPDATE atividades SET {set_clause} WHERE id = ?"
-    
-    # Pega os valores dos campos na ordem correta e adiciona o ID no final
-    params = list(dados.values())
-    params.append(id_atividade)
-    
+    # Relacionamento
+    categoria = relationship("Categoria", back_populates="atividades_padrao")
+
+def buscar_todos_usuarios(sess):
+    return sess.query(Usuario).order_by(Usuario.nome_completo).all()
+
+def buscar_usuario_por_id(sess, user_id):
+    return sess.get(Usuario, user_id)
+
+def atualizar_usuario(sess, user_id, novos_dados):
     try:
-        with get_db_conn() as conn:
-            cursor = conn.cursor()
-            cursor.execute(query, tuple(params))
-            conn.commit()
+        usuario = sess.get(Usuario, user_id)
+        if not usuario:
+            return False
+        for campo, valor in novos_dados.items():
+            if campo == 'senha' and valor:
+                valor_hash = hashlib.sha256(valor.encode()).hexdigest()
+                setattr(usuario, 'password_hash', valor_hash)
+            elif campo != 'senha':
+                setattr(usuario, campo, valor)
         return True
-    except sqlite3.Error as e:
-        print(f"Erro ao atualizar atividade: {e}")
+    except Exception as e:
+        print(f"ERRO ao atualizar usuário: {e}")
+        return False
+    
+def atualizar_relatorio(sess, caso_id, novos_dados):
+    """
+    Atualiza os dados de um relatório (caso) existente no banco de dados.
+    """
+    try:
+        # Busca o caso que queremos atualizar.
+        caso = sess.get(Caso, caso_id)
+        if not caso:
+            return False # Retorna falha se o caso não for encontrado.
+
+        # Itera sobre o dicionário de novos dados e atualiza o objeto.
+        for campo, valor in novos_dados.items():
+            setattr(caso, campo, valor)
+        
+        return True
+    except Exception as e:
+        print(f"ERRO ao atualizar relatório: {e}")
+        return False
+    
+# Adiona anexos relacionados a casos
+
+class Anexo(Base):
+    __tablename__ = 'anexos'
+    id = Column(Integer, primary_key=True)
+    nome_original = Column(String(255), nullable=False)
+    nome_seguro = Column(String(255), unique=True, nullable=False)
+    caminho = Column(String(512), nullable=False)
+    data_upload = Column(String(20), nullable=False, default=lambda: datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    
+    # Chave estrangeira para ligar o anexo a um caso
+    caso_id = Column(Integer, ForeignKey('casos.id'), nullable=False)
+    
+    # Relacionamento que permite aceder ao objeto 'Caso' a partir de um 'Anexo'
+    caso = relationship("Caso", back_populates="anexos")
+
+
+def adicionar_anexo(sess, caso_id, nome_original, nome_seguro, caminho):
+    """Cria o registo de um novo anexo no banco de dados."""
+    try:
+        novo_anexo = Anexo(
+            caso_id=caso_id,
+            nome_original=nome_original,
+            nome_seguro=nome_seguro,
+            caminho=caminho
+        )
+        sess.add(novo_anexo)
+        return True
+    except Exception as e:
+        print(f"ERRO ao adicionar anexo: {e}")
         return False
 
+# Adicione este novo conjunto de funções ao seu database.py
+
+def buscar_todas_categorias(sess):
+    """Busca todas as categorias, ordenadas por nome."""
+    return sess.query(Categoria).order_by(Categoria.nome).all()
+
+def buscar_categoria_por_id(sess, categoria_id):
+    """Busca uma única categoria pelo seu ID."""
+    return sess.get(Categoria, categoria_id)
+
+def adicionar_categoria(sess, nome):
+    """Adiciona uma nova categoria."""
+    try:
+        nova_categoria = Categoria(nome=nome)
+        sess.add(nova_categoria)
+        return True
+    except Exception as e:
+        print(f"ERRO ao adicionar categoria: {e}")
+        return False
+
+def atualizar_categoria(sess, categoria_id, nome):
+    """Atualiza o nome de uma categoria existente."""
+    try:
+        categoria = sess.get(Categoria, categoria_id)
+        if categoria:
+            categoria.nome = nome
+            return True
+        return False
+    except Exception as e:
+        print(f"ERRO ao atualizar categoria: {e}")
+        return False
+
+def deletar_categoria(sess, categoria_id):
+    """Deleta uma categoria e todas as atividades padrão associadas a ela."""
+    try:
+        categoria = sess.get(Categoria, categoria_id)
+        if categoria:
+            sess.delete(categoria)
+            return True
+        return False
+    except Exception as e:
+        print(f"ERRO ao deletar categoria: {e}")
+        return False
 
 if __name__ == '__main__':
-    if os.path.exists(DB_NAME):
-        os.remove(DB_NAME)
-        print("Banco de dados antigo removido.")
-
     inicializar_banco()
-    
-    adicionar_usuario("28685", "KAIQUE RAFAEL DOS SANTOS OLIVEIRA", "kaique.santos", "senha123", "Admin", gerente_id=None)
-    adicionar_usuario("12345", "MARCOS VINICIUS DAMASCENO", "marcos.vinicius", "outrasenha", "Auditor", gerente_id=1)
-    
-    adicionar_caso_exemplo()
-    adicionar_atividade_exemplo()
-    print("Banco de dados inicializado com dados de exemplo e hierarquia.")

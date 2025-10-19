@@ -15,7 +15,18 @@
 {% endblock %}
 
 {% block content %}
-    <h1 class="h3 mb-4">Editar Atividade</h1>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">Editar Atividade</h1>
+        
+        <div class="btn-group" role="group" aria-label="Histórico da Atividade">
+            <button type="button" class="btn btn-outline-info" id="btnVerHistoricoFilial" data-activity-id="{{ atividade.id }}">
+                <i class="fas fa-history"></i> Histórico (Filial)
+            </button>
+            <button type="button" class="btn btn-outline-secondary" id="btnVerHistoricoGlobal" data-activity-id="{{ atividade.id }}">
+                <i class="fas fa-globe"></i> Histórico (Global)
+            </button>
+        </div>
+    </div>
 
     <form action="" method="POST">
         <div class="mb-3">
@@ -29,16 +40,16 @@
         </div>
         <div class="mb-3">
             <label for="testes_realizados" class="form-label">Testes Realizados</label>
-            <textarea class="form-control" id="testes_realizados" name="testes_realizados" rows="3" required>{{ atividade.testes_realizados }}</textarea>
+            <textarea class="form-control" id="testes_realizados" name="testes_realizados" rows="3" required>{{ atividade.testes_realizados or '' }}</textarea>
         </div>
         <div class="mb-3">
             <label for="observacao_resumo" class="form-label">Observação / Resumo dos Achados</label>
-            <textarea class="form-control" id="observacao_resumo" name="observacao_resumo" rows="3">{{ atividade.observacao_resumo }}</textarea>
+            <textarea class="form-control" id="observacao_resumo" name="observacao_resumo" rows="3">{{ atividade.observacao_resumo or '' }}</textarea>
         </div>
         <div class="row">
             <div class="col-md-6 mb-3">
                 <label for="nao_conformidade" class="form-label">Não Conformidade (Opcional)</label>
-                <input type="text" class="form-control" id="nao_conformidade" name="nao_conformidade" value="{{ atividade.nao_conformidade }}">
+                <input type="text" class="form-control" id="nao_conformidade" name="nao_conformidade" value="{{ atividade.nao_conformidade or '' }}">
             </div>
             <div class="col-md-6 mb-3">
                 <label for="situacao" class="form-label">Situação</label>
@@ -51,11 +62,107 @@
         </div>
         <div class="mb-3">
             <label for="recomendacao" class="form-label">Recomendação (Opcional)</label>
-            <textarea class="form-control" id="recomendacao" name="recomendacao" rows="2">{{ atividade.recomendacao }}</textarea>
+            <textarea class="form-control" id="recomendacao" name="recomendacao" rows="2">{{ atividade.recomendacao or '' }}</textarea>
         </div>
         <div class="d-flex justify-content-end">
             <a href="{{ url_for('ver_relatorio', id_caso=caso.id) }}" class="btn btn-secondary me-2">Cancelar</a>
             <button type="submit" class="btn btn-primary">Salvar Alterações</button>
         </div>
     </form>
+
+    <div class="modal fade" id="historyModal" tabindex="-1" aria-labelledby="historyModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="historyModalLabel">Histórico da Atividade</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="historyModalBody">
+                    </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const historyModal = new bootstrap.Modal(document.getElementById('historyModal'));
+    const historyModalLabel = document.getElementById('historyModalLabel');
+    const historyModalBody = document.getElementById('historyModalBody');
+    
+    const historyButtonFilial = document.getElementById('btnVerHistoricoFilial');
+    const historyButtonGlobal = document.getElementById('btnVerHistoricoGlobal');
+
+    // Criamos uma função reutilizável para buscar e mostrar o histórico
+    function fetchAndShowHistory(activityId, type) {
+        let apiUrl = '';
+        let modalTitle = '';
+
+        // Define a URL da API e o título da modal com base no tipo de botão clicado
+        if (type === 'global') {
+            apiUrl = `/api/atividade/${activityId}/historico/global`;
+            modalTitle = 'Histórico Global da Atividade';
+        } else {
+            apiUrl = `/api/atividade/${activityId}/historico/filial`;
+            modalTitle = 'Histórico da Atividade na Filial';
+        }
+
+        historyModalLabel.textContent = modalTitle;
+        historyModalBody.innerHTML = '<p class="text-center">A carregar histórico...</p>';
+        historyModal.show();
+
+        fetch(apiUrl)
+            .then(response => response.ok ? response.json() : Promise.reject('Falha na resposta da rede.'))
+            .then(data => {
+                historyModalBody.innerHTML = '';
+                if (data.length === 0) {
+                    historyModalBody.innerHTML = '<p class="text-center">Nenhum histórico encontrado.</p>';
+                    return;
+                }
+
+                data.forEach(item => {
+                    // Adicionamos o nome da filial dinamicamente se for uma busca global
+                    const filialInfo = type === 'global' ? `(${item.filial_nome})` : '';
+                    
+                    const historicoCard = `
+                        <div class="card mb-3">
+                            <div class="card-header d-flex justify-content-between">
+                                <strong>Relatório: ${item.relatorio_numero} ${filialInfo}</strong>
+                                <small class="text-muted">Data: ${item.data_registro}</small>
+                            </div>
+                            <div class="card-body">
+                                <p><strong>Resumo:</strong> ${item.observacao_resumo || 'N/A'}</p>
+                                <p><strong>Não Conformidade:</strong> ${item.nao_conformidade || 'Nenhuma'}</p>
+                                <p><strong>Recomendação:</strong> ${item.recomendacao || 'Nenhuma'}</p>
+                            </div>
+                            <div class="card-footer text-muted d-flex justify-content-between">
+                                <span>Situação: <span class="badge bg-info">${item.situacao}</span></span>
+                                <span>Realizado por: ${item.realizado_por}</span>
+                            </div>
+                        </div>
+                    `;
+                    historyModalBody.innerHTML += historicoCard;
+                });
+            })
+            .catch(error => {
+                console.error('Erro ao buscar histórico:', error);
+                historyModalBody.innerHTML = '<p class="text-center text-danger">Ocorreu um erro ao carregar o histórico.</p>';
+            });
+    }
+
+    // Adiciona os "escutadores" de clique a cada botão
+    historyButtonFilial.addEventListener('click', function() {
+        fetchAndShowHistory(this.dataset.activityId, 'filial');
+    });
+
+    historyButtonGlobal.addEventListener('click', function() {
+        fetchAndShowHistory(this.dataset.activityId, 'global');
+    });
+});
+</script>
 {% endblock %}

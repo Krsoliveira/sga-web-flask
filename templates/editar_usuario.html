@@ -1,70 +1,60 @@
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-    <meta charset="UTF-8">
-    <title>SGA - Editar Usuário</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-</head>
-<body>
-    <div class="container">
-        <h1>Editando Usuário: {{ usuario.nome_completo }}</h1>
-        {% if session['dados_usuario']['role'] == 'Admin' %}
-            <a href="{{ url_for('gestao_usuarios') }}"><< Voltar para a Gestão de Usuários</a>
-        {% else %}
-            <a href="{{ url_for('dashboard') }}"><< Voltar para o Dashboard</a>
-        {% endif %}
-        <hr>
+{% extends "base.html" %}
+{% block title %}Editar Usuário{% endblock %}
 
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="flash-{{ category }}">{{ message }}</div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
+{% block content %}
+    <h1 class="h3 mb-4">Editando Usuário: <span class="text-primary">{{ usuario_para_editar.nome_completo }}</span></h1>
 
-        <form action="{{ url_for('editar_usuario', user_id=usuario.id) }}" method="POST">
-            <label for="codigo">Código do Colaborador:</label>
-            <input type="text" id="codigo" name="codigo" value="{{ usuario.codigo }}" required>
+    <form action="{{ url_for('editar_usuario', user_id=usuario_para_editar.id) }}" method="POST">
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <label for="codigo" class="form-label">Código do Colaborador</label>
+                <input type="text" class="form-control" id="codigo" name="codigo" value="{{ usuario_para_editar.codigo }}" required>
+            </div>
+            <div class="col-md-6">
+                <label for="nome_completo" class="form-label">Nome Completo</label>
+                <input type="text" class="form-control" id="nome_completo" name="nome_completo" value="{{ usuario_para_editar.nome_completo }}" required>
+            </div>
+        </div>
+        
+        <div class="row mb-3">
+             <div class="col-md-6">
+                <label for="username" class="form-label">Nome de Usuário (username)</label>
+                <input type="text" class="form-control" id="username" name="username" value="{{ usuario_para_editar.username }}" readonly>
+            </div>
+            <div class="col-md-6">
+                <label for="role" class="form-label">Papel</label>
+                <select class="form-select" id="role" name="role" required>
+                    {% for role in roles %}
+                        <option value="{{ role }}" {% if role == usuario_para_editar.role %}selected{% endif %}>{{ role }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
 
-            <label for="nome_completo">Nome Completo:</label>
-            <input type="text" id="nome_completo" name="nome_completo" value="{{ usuario.nome_completo }}" required>
-
-            <label for="username">Nome de Usuário (username):</label>
-            <input type="text" id="username" name="username" value="{{ usuario.username }}" readonly class="readonly-input">
-
-            <label for="role">Papel:</label>
-            <select id="role" name="role" required>
-                {% for role in roles %}
-                    <option value="{{ role }}" {% if role == usuario.role %}selected{% endif %}>
-                        {{ role }}
-                    </option>
-                {% endfor %}
-            </select>
-
-            <label for="gerente_id">Gerente Direto:</label>
-            <select id="gerente_id" name="gerente_id">
+        <div class="mb-3">
+            <label for="gerente_id" class="form-label">Gerente Direto (Opcional)</label>
+            <select class="form-select" id="gerente_id" name="gerente_id">
                 <option value="">Nenhum</option>
                 {% for gerente in gerentes %}
-                    <option value="{{ gerente.id }}" {% if gerente.id == usuario.gerente_id %}selected{% endif %}>
-                        {{ gerente.nome_completo }}
-                    </option>
+                    <option value="{{ gerente.id }}" {% if gerente.id == usuario_para_editar.gerente_id %}selected{% endif %}>{{ gerente.nome_completo }}</option>
                 {% endfor %}
             </select>
-            
-            <hr>
-            <p><i>Deixe os campos de senha em branco para não a alterar.</i></p>
-            <label for="nova_senha">Nova Senha:</label>
-            <input type="password" id="nova_senha" name="nova_senha">
+        </div>
 
-            <label for="confirmar_senha">Confirmar Nova Senha:</label>
-            <input type="password" id="confirmar_senha" name="confirmar_senha">
-            
-            <div class="form-actions" style="text-align: left; margin-top: 20px;">
-                <input type="submit" value="Salvar Alterações">
+        <hr class="my-4">
+        
+        <h2 class="h5 mb-3">Alterar Senha</h2>
+        <p class="text-muted small">Deixe os campos de senha em branco para não a alterar.</p>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="nova_senha" class="form-label">Nova Senha</label>
+                <input type="password" class="form-control" id="nova_senha" name="nova_senha">
             </div>
-        </form>
-
-    </div>
-</body>
-</html>
+        </div>
+        
+        <div class="d-flex justify-content-end mt-4">
+            <a href="{{ url_for('gestao_usuarios') }}" class="btn btn-secondary me-2">Cancelar</a>
+            <button type="submit" class="btn btn-primary">Salvar Alterações</button>
+        </div>
+    </form>
+{% endblock %}

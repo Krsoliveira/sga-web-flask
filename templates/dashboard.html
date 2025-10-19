@@ -5,11 +5,11 @@
 {% block content %}
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h1 class="h3 mb-0 text-gray-800">Dashboard de Relatórios</h1>
-        <form action="{{ url_for('novo_relatorio') }}" method="POST">
-            <button type="submit" class="btn btn-primary">
-                <i class="fas fa-plus-circle"></i> Criar Novo Relatório
-            </button>
-        </form>
+        
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalCriarRelatorio">
+            <i class="fas fa-plus-circle"></i> Criar Novo Relatório
+        </button>
+
     </div>
 
     <p class="text-muted">Bem-vindo(a) de volta, {{ usuario.nome_completo }}.</p>
@@ -34,12 +34,12 @@
                 <td>{{ caso.titulo }}</td>
                 <td>
                     <span class="badge 
-                          {% if caso.status == 'Aprovado' %} bg-success
-                          {% elif caso.status == 'Pendente de Revisão' %} bg-warning
-                          {% elif caso.status == 'Em Elaboração' %} bg-info
-                          {% else %} bg-secondary
-                          {% endif %}">
-                          {{ caso.status }}
+                            {% if caso.status == 'Aprovado' %} bg-success
+                            {% elif caso.status == 'Pendente de Revisão' %} bg-warning
+                            {% elif caso.status == 'Em Elaboração' %} bg-info
+                            {% else %} bg-secondary
+                            {% endif %}">
+                            {{ caso.status }}
                     </span>
                 </td>
                 <td>
@@ -55,4 +55,72 @@
         </tbody>
     </table>
 
+    <div class="modal fade" id="modalCriarRelatorio" tabindex="-1" aria-labelledby="modalCriarRelatorioLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalCriarRelatorioLabel">Criar Novo Relatório de Auditoria</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form action="" method="POST" id="formCriarRelatorio">
+                    <div class="modal-body">
+                        <p>Selecione a filial e o modelo de auditoria para começar.</p>
+                        
+                        <div class="mb-3">
+                            <label for="filialSelect" class="form-label">Filial</label>
+                            <select class="form-select" id="filialSelect" name="filial_id" required>
+                                <option value="" selected disabled>Selecione uma filial...</option>
+                                {% for filial in filiais %}
+                                    <option value="{{ filial.id }}">{{ filial.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="categoriaSelect" class="form-label">Modelo de Auditoria</label>
+                            <select class="form-select" id="categoriaSelect" name="categoria_id" required>
+                                <option value="" selected disabled>Selecione uma categoria...</option>
+                                {% for categoria in categorias %}
+                                    <option value="{{ categoria.id }}">{{ categoria.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Criar Relatório</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('formCriarRelatorio');
+    const categoriaSelect = document.getElementById('categoriaSelect');
+
+    // Função para atualizar o 'action' do formulário
+    function updateFormAction() {
+        const categoriaId = categoriaSelect.value;
+        if (categoriaId) {
+            // Constrói a URL final com o ID da categoria selecionada
+            const actionUrl = "{{ url_for('novo_relatorio_por_categoria', categoria_id=0) }}".replace('0', categoriaId);
+            form.action = actionUrl;
+        } else {
+            form.action = ""; // Limpa a ação se nada for selecionado
+        }
+    }
+
+    // Atualiza a rota do formulário dinamicamente quando uma categoria é selecionada
+    categoriaSelect.addEventListener('change', updateFormAction);
+
+    // Chama a função uma vez no início para o caso de haver valores pré-selecionados
+    updateFormAction();
+});
+</script>
 {% endblock %}

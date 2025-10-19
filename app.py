@@ -7,6 +7,8 @@ import database as db
 import config
 import pprint
 from werkzeug.utils import secure_filename
+import pdf_generator  
+from flask import make_response  
 
 load_dotenv()
 app = Flask(__name__)
@@ -115,26 +117,43 @@ def logout():
 @login_required
 def dashboard():
     with db.get_db() as sess:
-        lista_de_casos = db.buscar_casos(sess) 
-    return render_template('dashboard.html', casos=lista_de_casos)
+        lista_de_casos = db.buscar_casos(sess)
+        todas_categorias = db.buscar_todas_categorias(sess)
+        todas_filiais = db.buscar_todas_filiais(sess)
+       
+    return render_template('dashboard.html', 
+                           casos=lista_de_casos, 
+                           categorias=todas_categorias, 
+                           filiais=todas_filiais)
 
 # --- ROTAS DE RELATÓRIO E WORKFLOW ---
-@app.route('/relatorio/novo', methods=['POST'])
+
+@app.route('/relatorio/novo/categoria/<int:categoria_id>', methods=['POST'])
 @login_required
-def novo_relatorio():
-    hoje = date.today()
+def novo_relatorio_por_categoria(categoria_id):
     try:
+        # Apanha o filial_id que vem do formulário na modal
+        filial_id = request.form.get('filial_id')
+        if not filial_id:
+            flash('Por favor, selecione uma filial.', 'warning')
+            return redirect(url_for('dashboard'))
+
         with db.get_db() as sess:
-            novo_id = db.adicionar_novo_caso(sess, "Novo Relatório (preencher)", "Auditoria", hoje, "Em Elaboração")
+            novo_id = db.criar_caso_com_atividades_padrao(
+                sess, 
+                categoria_id=categoria_id, 
+                filial_id=filial_id, 
+                realizado_por_id=g.user.id
+            )
         
         if novo_id:
-            flash('Novo relatório criado com sucesso!', 'success')
+            flash(f'Novo relatório criado com sucesso!', 'success')
             return redirect(url_for('ver_relatorio', id_caso=novo_id))
         else:
             raise Exception("A criação do novo caso retornou um ID inválido.")
             
     except Exception as e:
-        print(f"ERRO ao criar novo relatório: {e}")
+        print(f"ERRO na rota novo_relatorio_por_categoria: {e}")
         flash('Erro ao criar novo relatório.', 'danger')
         return redirect(url_for('dashboard'))
 
@@ -155,6 +174,44 @@ def ver_relatorio(id_caso):
                            atividades=lista_atividades, 
                            opcoes_atividade=config.LISTA_ATIVIDADES, 
                            opcoes_situacao=config.LISTA_SITUACAO)
+
+# Adicione esta nova rota ao seu app.py
+
+@app.route('/relatorio/<int:id_caso>/pdf')
+@login_required
+def gerar_pdf_relatorio(id_caso):
+    """
+    Gera e envia o relatório completo em formato PDF para download.
+    """
+    try:
+        # 1. Busca todos os dados necessários do banco.
+        # A nossa função buscar_caso_por_id já é perfeita para isto, pois carrega tudo!
+        with db.get_db() as sess:
+            caso = db.buscar_caso_por_id(sess, id_caso)
+        
+        if not caso:
+            flash('Relatório não encontrado.', 'danger')
+            return redirect(url_for('dashboard'))
+
+        # 2. Chama o nosso "Motor de PDF", passando os dados.
+        # Ele nos devolve o PDF pronto, guardado na memória.
+        pdf_buffer = pdf_generator.gerar_relatorio_pdf(caso, caso.atividades)
+        
+        # 3. Constrói a resposta HTTP que será enviada para o navegador.
+        response = make_response(pdf_buffer.getvalue())
+        
+        # 4. Define os "cabeçalhos" da resposta para que o navegador entenda o que fazer.
+        #    'Content-Type' diz: "Isto é um ficheiro PDF".
+        response.headers['Content-Type'] = 'application/pdf'
+        #    'Content-Disposition' diz: "Trate isto como um anexo para download e sugira este nome de ficheiro".
+        response.headers['Content-Disposition'] = f'attachment; filename=relatorio_{caso.numero_relatorio or caso.id}.pdf'
+        
+        return response
+
+    except Exception as e:
+        print(f"ERRO ao gerar PDF: {e}")
+        flash('Ocorreu um erro ao gerar o relatório PDF.', 'danger')
+        return redirect(url_for('ver_relatorio', id_caso=id_caso))
 
 @app.route('/relatorio/<int:id_caso>/adicionar_atividade', methods=['POST'])
 @login_required
@@ -179,8 +236,6 @@ def adicionar_atividade(id_caso):
         flash('Ocorreu um erro ao salvar a atividade.', 'danger')
 
     return redirect(url_for('ver_relatorio', id_caso=id_caso))
-
-# Adicione esta nova rota ao seu app.py
 
 @app.route('/relatorio/<int:id_caso>/anexar', methods=['POST'])
 @login_required
@@ -263,7 +318,6 @@ def rejeitar_relatorio(id_caso):
         flash('Ocorreu um erro ao rejeitar o relatório.', 'danger')
     return redirect(url_for('ver_relatorio', id_caso=id_caso))
 
-# Adicione esta rota ao seu app.py
 
 @app.route('/uploads/<string:nome_seguro>')
 @login_required
@@ -422,7 +476,7 @@ def criar_usuario():
 @login_required
 def editar_usuario(user_id):
     
-    # ALTERADO: A verificação de permissão usa g.user
+    # A verificação de permissão usa g.user
     if g.user.role not in ['Admin', 'Manager'] and g.user.id != user_id:
         flash('Você não tem permissão para editar este perfil.', 'danger')
         return redirect(url_for('dashboard'))
@@ -458,9 +512,9 @@ def editar_usuario(user_id):
             return redirect(url_for('editar_usuario', user_id=user_id))
 
     with db.get_db() as sess:
-        lista_gerentes = db.buscar_todos_usuarios(sess)
-    return render_template('editar_usuario.html', usuario=usuario_para_editar, roles=config.LISTA_ROLES, gerentes=lista_gerentes)
-
+        lista_gerentes = db.buscar_todos_usuarios(sess)      
+   
+    return render_template('editar_usuario.html', usuario_para_editar=usuario_para_editar, roles=config.LISTA_ROLES, gerentes=lista_gerentes)
 
 @app.route('/atividade/<int:id_atividade>/editar', methods=['GET', 'POST'])
 @login_required
@@ -498,6 +552,71 @@ def editar_atividade(id_atividade):
         caso = db.buscar_caso_por_id(sess, atividade_atual.caso_id)
     return render_template('editar_atividade.html', atividade=atividade_atual, caso=caso, opcoes_atividade=config.LISTA_ATIVIDADES, opcoes_situacao=config.LISTA_SITUACAO)
 
+# Rota para LISTAR todas as filiais
+@app.route('/admin/filiais')
+@login_required
+@role_required('Admin', 'Manager')
+def gestao_filiais():
+    with db.get_db() as sess:
+        filiais = db.buscar_todas_filiais(sess)
+    return render_template('gestao_filiais.html', filiais=filiais)
+
+# Rota para ADICIONAR uma nova filial
+@app.route('/admin/filial/nova', methods=['GET', 'POST'])
+@login_required
+@role_required('Admin', 'Manager')
+def adicionar_filial_route():
+    if request.method == 'POST':
+        nome = request.form.get('nome')
+        cidade = request.form.get('cidade')
+        if nome:
+            with db.get_db() as sess:
+                sucesso = db.adicionar_filial(sess, nome, cidade)
+            if sucesso:
+                flash('Filial criada com sucesso!', 'success')
+                return redirect(url_for('gestao_filiais'))
+            else:
+                flash('Erro ao criar filial. O nome já pode existir.', 'danger')
+    return render_template('form_filial.html')
+
+# Rota para EDITAR uma filial
+@app.route('/admin/filial/editar/<int:filial_id>', methods=['GET', 'POST'])
+@login_required
+@role_required('Admin', 'Manager')
+def editar_filial_route(filial_id):
+    with db.get_db() as sess:
+        filial = db.buscar_filial_por_id(sess, filial_id)
+    if not filial:
+        flash('Filial não encontrada.', 'danger')
+        return redirect(url_for('gestao_filiais'))
+        
+    if request.method == 'POST':
+        nome = request.form.get('nome')
+        cidade = request.form.get('cidade')
+        if nome:
+            with db.get_db() as sess:
+                sucesso = db.atualizar_filial(sess, filial_id, nome, cidade)
+            if sucesso:
+                flash('Filial atualizada com sucesso!', 'success')
+                return redirect(url_for('gestao_filiais'))
+            else:
+                flash('Erro ao atualizar filial.', 'danger')
+
+    return render_template('form_filial.html', filial=filial)
+
+# Rota para DELETAR uma filial
+@app.route('/admin/filial/deletar/<int:filial_id>', methods=['POST'])
+@login_required
+@role_required('Admin', 'Manager')
+def deletar_filial_route(filial_id):
+    with db.get_db() as sess:
+        sucesso = db.deletar_filial(sess, filial_id)
+    if sucesso:
+        flash('Filial deletada com sucesso!', 'success')
+    else:
+        flash('Erro ao deletar filial. Verifique se não existem relatórios associados a ela.', 'danger')
+    return redirect(url_for('gestao_filiais'))
+
 # --- ROTAS DE API ---
 @app.route('/api/get-user-name/<string:codigo>')
 def get_user_name(codigo):
@@ -523,6 +642,81 @@ def get_atividade_details(id_atividade):
         return jsonify(atividade_dict)
     else:
         return jsonify({'error': 'Atividade não encontrada'}), 404
+    
+
+@app.route('/api/atividade/<int:id_atividade_atual>/historico/filial')
+@login_required
+def get_historico_atividade_filial(id_atividade_atual):
+    """
+    API para buscar o histórico de uma atividade específica na mesma filial.
+    """
+    try:
+        with db.get_db() as sess:
+            # 1. Primeiro, buscamos o objeto da atividade ATUAL para ter as "coordenadas"
+            atividade_atual = db.buscar_atividade_por_id(sess, id_atividade_atual)
+            if not atividade_atual:
+                return jsonify({'error': 'Atividade atual não encontrada'}), 404
+
+            # 2. Usamos a nossa nova função de consulta inteligente
+            atividades_historicas = db.buscar_historico_atividade_na_filial(sess, atividade_atual)
+            
+            # 3. Formatamos os resultados para enviá-los como JSON
+            historico_formatado = []
+            for at_hist in atividades_historicas:
+                historico_formatado.append({
+                    'relatorio_numero': at_hist.caso.numero_relatorio,
+                    'data_registro': at_hist.data_registro,
+                    'realizado_por': at_hist.realizado_por.nome_completo if at_hist.realizado_por else 'N/A',
+                    'observacao_resumo': at_hist.observacao_resumo,
+                    'nao_conformidade': at_hist.nao_conformidade,
+                    'recomendacao': at_hist.recomendacao,
+                    'situacao': at_hist.situacao
+                })
+        
+        # 4. Retornamos a lista de históricos formatada
+        return jsonify(historico_formatado)
+
+    except Exception as e:
+        print(f"ERRO na API de histórico: {e}")
+        return jsonify({'error': 'Ocorreu um erro interno ao buscar o histórico.'}), 500 
+
+# Adicione esta nova rota ao seu app.py, logo após a outra API de histórico
+
+@app.route('/api/atividade/<int:id_atividade_atual>/historico/global')
+@login_required
+def get_historico_atividade_global(id_atividade_atual):
+    """
+    API para buscar o histórico de uma atividade específica em TODAS as filiais.
+    """
+    try:
+        with db.get_db() as sess:
+            # 1. Buscamos a atividade atual para saber o que procurar
+            atividade_atual = db.buscar_atividade_por_id(sess, id_atividade_atual)
+            if not atividade_atual:
+                return jsonify({'error': 'Atividade atual não encontrada'}), 404
+
+            # 2. Chamamos a nossa nova função de consulta global
+            atividades_historicas = db.buscar_historico_atividade_global(sess, atividade_atual)
+            
+            # 3. Formatamos os resultados para JSON, incluindo o nome da filial
+            historico_formatado = []
+            for at_hist in atividades_historicas:
+                historico_formatado.append({
+                    'relatorio_numero': at_hist.caso.numero_relatorio,
+                    'filial_nome': at_hist.caso.filial.nome if at_hist.caso.filial else 'N/A', # A informação extra que precisamos!
+                    'data_registro': at_hist.data_registro,
+                    'realizado_por': at_hist.realizado_por.nome_completo if at_hist.realizado_por else 'N/A',
+                    'observacao_resumo': at_hist.observacao_resumo,
+                    'nao_conformidade': at_hist.nao_conformidade,
+                    'recomendacao': at_hist.recomendacao,
+                    'situacao': at_hist.situacao
+                })
+        
+        return jsonify(historico_formatado)
+
+    except Exception as e:
+        print(f"ERRO na API de histórico global: {e}")
+        return jsonify({'error': 'Ocorreu um erro interno ao buscar o histórico global.'}), 500       
 
 if __name__ == '__main__':
     app.run(debug=True)

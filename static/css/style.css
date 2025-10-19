@@ -1,134 +1,104 @@
-/* =================================== */
-/* ==== ESTILOS GERAIS DA APLICAÇÃO ==== */
-/* =================================== */
+/* ================================================================ */
+/* ==== NOVA PALETA DE CORES PROFISSIONAL ==== */
+/* ================================================================ */
 
-body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    background-color: #f4f7f6;
-    color: #333;
-    margin: 0;
+/* Aqui, definimos as "cores mestras" da aplicação. Ao mudar a variável --bs-primary,
+  todos os componentes do Bootstrap que usam a cor primária (como .bg-primary, 
+  .btn-primary, .table-primary) mudarão automaticamente.
+*/
+:root {
+    /* Cor primária: substitui o azul padrão por um cinza-carvão elegante. */
+    --bs-primary: #212529; 
+    --bs-primary-rgb: 33, 37, 41;
+
+    /* Cor secundária: cinza médio para ações como 'Editar' ou 'Cancelar'. */
+    --bs-secondary: #6c757d;
+    --bs-secondary-rgb: 108, 117, 125;
+    
+    /* Cores de feedback (sucesso, aviso, etc.) mantêm-se para clareza. */
+    --bs-success: #198754;
+    --bs-warning: #ffc107;
+    --bs-info: #0dcaf0;
+    --bs-danger: #dc3545;
+
+    /* Cores do corpo da página para um visual limpo e de alto contraste. */
+    --bs-body-bg: #f8f9fa;   /* Fundo cinza muito claro (off-white). */
+    --bs-body-color: #343a40; /* Texto principal em cinza escuro. */
+
+    /* Links usarão um azul padrão para se destacarem como clicáveis. */
+    --bs-link-color: #0d6efd;
+    --bs-link-hover-color: #0a58ca;
 }
 
-/* Garante que o padding só se aplique em páginas com conteúdo principal, não no login */
-body:not(.login-body) {
-    padding: 20px;
-}
+/* ================================================================ */
+/* ==== ESTILOS GERAIS DE LAYOUT ==== */
+/* ================================================================ */
 
-.app-container {
-    max-width: 960px;
-    margin: 0 auto;
-    background-color: #ffffff;
-    padding: 20px;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-h1, h2 {
-    color: #005a9c;
-    border-bottom: 2px solid #e1e4e8;
-    padding-bottom: 10px;
-    margin-bottom: 20px;
-}
-
-a {
-    color: #0366d6;
-    text-decoration: none;
-}
-
-a:hover {
-    text-decoration: underline;
-}
-
-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 20px;
-}
-
-th, td {
-    padding: 12px;
-    text-align: left;
-    border-bottom: 1px solid #ddd;
-}
-
-/* ... (outros estilos gerais que você tinha) ... */
-
-
-/* =================================== */
-/* ===== ESTILOS DA TELA DE LOGIN ==== */
-/* =================================== */
-
-body.login-body {
+/* Estilo do corpo para a tela de Login */
+.login-body {
+    background-color: var(--bs-primary); /* Usa a nossa nova cor primária escura */
     background-image: url('../images/background.jpg');
     background-size: cover;
     background-position: center;
-    background-repeat: no-repeat;
-    min-height: 100vh;
+    background-blend-mode: overlay; /* Efeito elegante que escurece a imagem de fundo */
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 0;
+    min-height: 100vh;
 }
 
-.login-body .container {
-    max-width: none;
-    margin: 0;
-    background-color: transparent;
-    padding: 0;
-    box-shadow: none;
-}
-
+/* Card da tela de login com efeito de vidro fosco */
 .login-card {
-    background-color: rgba(255, 255, 255, 0.15);
+    background-color: rgba(0, 0, 0, 0.6);
     backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    -webkit-backdrop-filter: blur(10px); /* Para compatibilidade com Safari */
     border-radius: 1rem;
-    padding: 2rem;
+    padding: 2.5rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.login-card .form-control::placeholder {
-    color: #d1d1d1;
+/* Container principal da aplicação (páginas internas) */
+.app-container {
+    max-width: 1200px;
+    margin: auto;
 }
 
-.login-card .input-group-text {
-    background-color: rgba(255, 255, 255, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    color: white;
+/* Card principal das páginas internas com um design mais limpo */
+.app-container .card {
+    border: 1px solid #dee2e6; /* Borda mais suave que a sombra */
+    border-radius: 0.5rem; 
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075); /* Sombra mais subtil */
 }
 
-/* ============================================= */
-/* ==== CORREÇÕES DE COR PARA A NAVBAR ==== */
-/* ============================================= */
+/* ================================================================ */
+/* ==== AJUSTES EM COMPONENTES BOOTSTRAP ==== */
+/* ================================================================ */
 
-.navbar.bg-primary {
-    background-color: #0d6efd !important; /* Força a cor de fundo azul primário */
+/* Com as variáveis :root definidas, não precisamos mais de forçar a cor
+  da navbar com !important. A classe .bg-primary já entende a nova cor.
+  A classe .navbar-dark garante que o texto fique branco automaticamente.
+*/
+
+/* Botão Primário - Agora será escuro, de acordo com a nossa variável. */
+.btn-primary {
+    /* As cores já são herdadas, mas podemos definir o hover */
+    --bs-btn-hover-bg: #495057;
+    --bs-btn-hover-border-color: #495057;
 }
 
-/* Força a cor do texto para links na navbar para ser branco e totalmente opaco */
-.navbar-dark .navbar-nav .nav-link {
-    color: white !important;
+/* Cabeçalho da Tabela - Usará a nossa nova cor primária escura. */
+.table-primary {
+    --bs-table-bg: var(--bs-primary);
+    --bs-table-color: white;
+    border-color: #495057;
 }
 
-/* Garante que o texto da marca (SGA) também seja branco */
-.navbar-dark .navbar-brand {
-    color: white !important;
+/* Ajuste de contraste para os badges de status */
+.badge.bg-warning, .badge.bg-info {
+    color: #000 !important; /* Texto preto para melhor legibilidade em fundos claros */
 }
 
-/* Melhora a visibilidade do ícone do menu responsivo */
-.navbar-dark .navbar-toggler-icon {
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28255, 255, 255, 1%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
-}
-
-/* Garante que a navbar fique acima do conteúdo */
-.navbar {
-  position: relative;
-  z-index: 1030;
-}
-
-/* Força os links e ícones da navbar a serem brancos e visíveis */
-.navbar .nav-link,
-.navbar .navbar-brand {
-  color: #fff !important;
-  fill: currentColor !important; /* Garante que ícones SVG herdem a cor */
+/* Remove a sublinhação de links dentro de botões e outros componentes */
+a.btn, a.dropdown-item, a.nav-link {
+    text-decoration: none;
 }

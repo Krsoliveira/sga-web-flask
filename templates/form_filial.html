@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}{% if filial %}Editar Filial{% else %}Nova Filial{% endif %}{% endblock %}
+
+{% block content %}
+    <h1 class="h3 mb-4">
+        {% if filial %}
+            Editar Filial: {{ filial.nome }}
+        {% else %}
+            Criar Nova Filial
+        {% endif %}
+    </h1>
+
+    <form method="POST">
+        <div class="mb-3">
+            <label for="nome" class="form-label">Nome da Filial</label>
+            <input type="text" class="form-control" id="nome" name="nome" value="{{ filial.nome if filial else '' }}" required>
+        </div>
+        <div class="mb-3">
+            <label for="cidade" class="form-label">Cidade (Opcional)</label>
+            <input type="text" class="form-control" id="cidade" name="cidade" value="{{ filial.cidade if filial else '' }}">
+        </div>
+        
+        <div class="d-flex justify-content-end">
+            <a href="{{ url_for('gestao_filiais') }}" class="btn btn-secondary me-2">Cancelar</a>
+            <button type="submit" class="btn btn-primary">Salvar</button>
+        </div>
+    </form>
+{% endblock %}

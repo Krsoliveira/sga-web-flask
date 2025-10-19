@@ -56,9 +56,15 @@
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     Detalhes do Relatório
-                    <a href="{{ url_for('editar_relatorio', id_caso=caso.id) }}" class="btn btn-secondary btn-sm">
-                        <i class="fas fa-pencil-alt"></i> Editar
-                    </a>
+                    
+                    <div class="btn-group" role="group">
+                        <a href="{{ url_for('editar_relatorio', id_caso=caso.id) }}" class="btn btn-secondary btn-sm">
+                            <i class="fas fa-pencil-alt"></i> Editar
+                        </a>
+                        <a href="{{ url_for('gerar_pdf_relatorio', id_caso=caso.id) }}" class="btn btn-success btn-sm">
+                            <i class="fas fa-file-pdf"></i> Gerar PDF
+                        </a>
+                    </div>
                 </div>
                 <div class="card-body">
                     <p><strong>Tipo:</strong> {{ caso.tipo }}</p>
@@ -152,7 +158,7 @@
 
     </div>
 
-    <div class="modal fade" id="activityDetailModal" tabindex="-1" aria-labelledby="activityDetailModalLabel" aria-hidden="true">
+<div class="modal fade" id="activityDetailModal" tabindex="-1" aria-labelledby="activityDetailModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
@@ -233,4 +239,4 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 </script>
-{% endblock %} 
+{% endblock %}    

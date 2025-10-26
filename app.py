@@ -225,7 +225,9 @@ def adicionar_atividade(id_caso):
         'situacao': request.form.get('situacao'),
         'realizado_por_id': g.user.id, # ALTERADO: Usa g.user.id
         'data_registro': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        'caso_id': id_caso
+        'caso_id': id_caso,
+        'periodo_inicio': request.form.get('periodo_inicio'), 
+        'periodo_fim': request.form.get('periodo_fim')
     }
     with db.get_db() as sess:
         sucesso = db.salvar_atividade(sess, dados_formulario)
@@ -517,7 +519,7 @@ def editar_usuario(user_id):
     return render_template('editar_usuario.html', usuario_para_editar=usuario_para_editar, roles=config.LISTA_ROLES, gerentes=lista_gerentes)
 
 @app.route('/atividade/<int:id_atividade>/editar', methods=['GET', 'POST'])
-@login_required
+@login_required 
 def editar_atividade(id_atividade):
     with db.get_db() as sess:
         atividade_atual = db.buscar_atividade_por_id(sess, id_atividade)
@@ -532,7 +534,9 @@ def editar_atividade(id_atividade):
             'observacao_resumo': request.form.get('observacao_resumo'),
             'nao_conformidade': request.form.get('nao_conformidade'),
             'situacao': request.form.get('situacao'),
-            'recomendacao': request.form.get('recomendacao')
+            'recomendacao': request.form.get('recomendacao'),
+            'periodo_inicio': request.form.get('periodo_inicio'),
+            'periodo_fim': request.form.get('periodo_fim')
         }
         campos_para_atualizar = {k: v for k, v in dados_do_formulario.items() if str(v or '') != str(getattr(atividade_atual, k) or '')}
 
@@ -632,13 +636,18 @@ def get_user_name(codigo):
 @login_required
 def get_atividade_details(id_atividade):
     with db.get_db() as sess:
+        # A nossa função buscar_atividade_por_id já faz o eager load do realizado_por
         atividade = db.buscar_atividade_por_id(sess, id_atividade)
     if atividade:
-        atividade_dict = db.object_as_dict(atividade)
+        # object_as_dict incluirá periodo_inicio e periodo_fim automaticamente!
+        atividade_dict = db.object_as_dict(atividade) 
+        
+        # Adicionamos o nome do responsável
         if atividade.realizado_por:
             atividade_dict['realizado_por_nome'] = atividade.realizado_por.nome_completo
         else:
             atividade_dict['realizado_por_nome'] = 'Não atribuído'
+            
         return jsonify(atividade_dict)
     else:
         return jsonify({'error': 'Atividade não encontrada'}), 404

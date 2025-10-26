@@ -2,10 +2,11 @@ import os
 import hashlib
 import datetime
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, event, Column, Integer, String, ForeignKey, Text
-from sqlalchemy.orm import sessionmaker, declarative_base, relationship, scoped_session, joinedload
+from sqlalchemy import create_engine, event, Column, Integer, String, ForeignKey, Text, func, extract
+from sqlalchemy.orm import sessionmaker, declarative_base, relationship, scoped_session, joinedload, Session
 from sqlalchemy.inspection import inspect
 from contextlib import contextmanager
+import sqlalchemy # Necessário para sqlalchemy.Date na consulta de contagem
 
 # Carrega as variáveis de ambiente do arquivo .env
 load_dotenv()
@@ -45,7 +46,7 @@ class Caso(Base):
     __tablename__ = 'casos'
     id = Column(Integer, primary_key=True)
     titulo = Column(String(255), nullable=False)
-    numero_relatorio = Column(String(50), unique=True)
+    numero_relatorio = Column(String(50), unique=True) # Identificador único interno
     tipo = Column(String(100), nullable=False)
     data_inicio = Column(String(20), nullable=False)
     data_final = Column(String(20))
@@ -53,11 +54,34 @@ class Caso(Base):
     notas_revisao = Column(Text)
     categoria_id = Column(Integer, ForeignKey('categorias.id'))
     filial_id = Column(Integer, ForeignKey('filiais.id'))
+    sequencial_ano = Column(Integer) # Nova coluna para o sequencial NNN
 
+    # Relacionamentos...
+    categoria = relationship("Categoria", back_populates="casos")
     atividades = relationship("Atividade", back_populates="caso", cascade="all, delete-orphan")
     anexos = relationship("Anexo", back_populates="caso", cascade="all, delete-orphan")
-    categoria = relationship("Categoria", back_populates="casos")
     filial = relationship("Filial", back_populates="casos")
+    
+    @property
+    def numero_relatorio_display(self):
+        """
+        Gera o número do relatório formatado (YYYY.NNN MM/YYYY - Filial)
+        usando o sequencial_ano guardado. É rápido e seguro.
+        """
+        try:
+            data_obj = datetime.datetime.strptime(self.data_inicio, "%Y-%m-%d")
+            report_year = data_obj.year
+            formatted_month_year = data_obj.strftime("%m/%Y")
+        except:
+            report_year = "ANO?"
+            formatted_month_year = "Data Inválida"
+            
+        sequence_num = self.sequencial_ano or 0 
+        formatted_sequence = f"{sequence_num:03d}"
+        
+        filial_nome = self.filial.nome if self.filial else "Filial Desconhecida"
+        
+        return f"{report_year}.{formatted_sequence} {formatted_month_year} - {filial_nome}"
 
 class Filial(Base):
     __tablename__ = 'filiais'
@@ -65,8 +89,7 @@ class Filial(Base):
     nome = Column(String(150), unique=True, nullable=False)
     cidade = Column(String(100))
     
-    # Relacionamento para aceder a todos os casos (relatórios) desta filial
-    casos = relationship("Caso", back_populates="filial")    
+    casos = relationship("Caso", back_populates="filial")
 
 class Atividade(Base):
     __tablename__ = 'atividades'
@@ -80,9 +103,35 @@ class Atividade(Base):
     data_registro = Column(String(20), nullable=False)
     situacao = Column(String(50))
     realizado_por_id = Column(Integer, ForeignKey('usuarios.id'))
+    periodo_inicio = Column(String(20), nullable=True) 
+    periodo_fim = Column(String(20), nullable=True)    
     
     caso = relationship("Caso", back_populates="atividades")
     realizado_por = relationship("Usuario", back_populates="atividades_realizadas")
+
+class Anexo(Base):
+    __tablename__ = 'anexos'
+    id = Column(Integer, primary_key=True)
+    nome_original = Column(String(255), nullable=False)
+    nome_seguro = Column(String(255), unique=True, nullable=False)
+    caminho = Column(String(512), nullable=False)
+    data_upload = Column(String(20), nullable=False, default=lambda: datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    caso_id = Column(Integer, ForeignKey('casos.id'), nullable=False)
+    caso = relationship("Caso", back_populates="anexos")
+
+class Categoria(Base):
+    __tablename__ = 'categorias'
+    id = Column(Integer, primary_key=True)
+    nome = Column(String(100), unique=True, nullable=False)
+    atividades_padrao = relationship("AtividadePadrao", back_populates="categoria", cascade="all, delete-orphan")
+    casos = relationship("Caso", back_populates="categoria")
+
+class AtividadePadrao(Base):
+    __tablename__ = 'atividades_padrao'
+    id = Column(Integer, primary_key=True)
+    descricao = Column(Text, nullable=False)
+    categoria_id = Column(Integer, ForeignKey('categorias.id'), nullable=False)
+    categoria = relationship("Categoria", back_populates="atividades_padrao")
 
 # --- Funções de Acesso ao Banco de Dados ---
 @contextmanager
@@ -105,12 +154,10 @@ def inicializar_banco():
 
 def verificar_login(sess, codigo_usuario, senha):
     senha_hash = hashlib.sha256(senha.encode()).hexdigest()
-    # CORREÇÃO FINAL: Usando 'codigo', que é o nome correto do campo no modelo.
     usuario = sess.query(Usuario).filter_by(codigo=codigo_usuario, password_hash=senha_hash).first()
     return object_as_dict(usuario) if usuario else None
 
 def buscar_usuario_por_codigo(sess, codigo_usuario):
-    # CORREÇÃO FINAL: Usando 'codigo', que é o nome correto do campo no modelo.
     usuario_obj = sess.query(Usuario).filter_by(codigo=codigo_usuario).first()
     return object_as_dict(usuario_obj) if usuario_obj else None
 
@@ -133,8 +180,15 @@ def adicionar_usuario(sess, dados):
         return False
 
 def buscar_casos(sess):
-    return sess.query(Caso).order_by(Caso.id.desc()).all()
+    """
+    Busca todos os casos cadastrados no banco de dados, já carregando
+    a Filial associada (Eager Loading), ordenados pelo ID mais recente.
+    """
+    return sess.query(Caso).options(
+        joinedload(Caso.filial) 
+    ).order_by(Caso.id.desc()).all()
 
+# Esta função tornou-se obsoleta com a criação por categoria/filial, mas mantê-la não prejudica.
 def adicionar_novo_caso(sess, titulo, tipo, data_inicio, status):
     try:
         timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S%f")
@@ -153,19 +207,91 @@ def adicionar_novo_caso(sess, titulo, tipo, data_inicio, status):
         print(f"ERRO em adicionar_novo_caso: {e}")
         return None
 
+def criar_caso_com_atividades_padrao(sess, categoria_id, filial_id, realizado_por_id):
+    """
+    Cria um novo Caso, calcula o sequencial_ano e popula com Atividades Padrão.
+    """
+    try:
+        categoria = sess.query(Categoria).options(joinedload(Categoria.atividades_padrao)).filter_by(id=categoria_id).one()
+        filial = sess.get(Filial, filial_id)
+        if not filial:
+             raise ValueError(f"Filial com ID {filial_id} não encontrada.")
+
+        # --- CÁLCULO DO SEQUENCIAL ---
+        data_inicio_obj = datetime.date.today()
+        report_year = data_inicio_obj.year
+        
+        count_in_year = sess.query(func.count(Caso.id)).filter(
+            extract('year', func.cast(Caso.data_inicio, sqlalchemy.Date)) == report_year
+        ).scalar()
+        
+        next_sequence = count_in_year + 1
+        # -----------------------------
+
+        timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S%f")
+        numero_unico_db = f"REL-{timestamp}"
+
+        novo_caso = Caso(
+            titulo=f"Novo Relatório - {categoria.nome} ({filial.nome})",
+            numero_relatorio=numero_unico_db, 
+            tipo=categoria.nome,
+            data_inicio=str(data_inicio_obj),
+            status="Em Elaboração",
+            categoria_id=categoria_id,
+            filial_id=filial_id,
+            sequencial_ano=next_sequence # Guardando o sequencial
+        )
+        sess.add(novo_caso)
+        
+        if categoria.atividades_padrao:
+            for atividade_padrao in categoria.atividades_padrao:
+                nova_atividade = Atividade(
+                    caso=novo_caso,
+                    atividade_desc=atividade_padrao.descricao,
+                    situacao="Pendente",
+                    realizado_por_id=realizado_por_id,
+                    data_registro=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                )
+                sess.add(nova_atividade)
+        
+        sess.flush()
+        return novo_caso.id
+
+    except Exception as e:
+        print(f"ERRO ao criar caso com atividades padrão: {e}")
+        return None
+# Adicione esta função ao seu database.py (ou confirme se já existe)
+
+def atualizar_atividade(sess, atividade_id, novos_dados):
+    """
+    Atualiza os dados de uma atividade existente no banco de dados.
+    """
+    try:
+        # 1. Busca a atividade que queremos atualizar.
+        atividade = sess.get(Atividade, atividade_id)
+        if not atividade:
+            return False # Retorna falha se a atividade não for encontrada.
+
+        # 2. Itera sobre o dicionário de novos dados (que pode incluir
+        #    'periodo_inicio', 'periodo_fim', 'observacao_resumo', etc.)
+        for campo, valor in novos_dados.items():
+            # Atualiza o atributo correspondente no objeto da atividade.
+            setattr(atividade, campo, valor)
+        
+        # O commit será feito pelo context manager 'get_db' em app.py
+        return True
+    except Exception as e:
+        print(f"ERRO ao atualizar atividade: {e}")
+        return False
+   
 def buscar_caso_por_id(sess, caso_id):
     """
-    Busca um único caso pelo seu ID, carregando TODOS os relacionamentos
-    necessários para a aplicação (atividades, anexos, filial e categoria).
+    Busca um único caso pelo seu ID, carregando TODOS os relacionamentos necessários.
     """
     return sess.query(Caso).options(
-        # Carrega as atividades e os seus usuários
         joinedload(Caso.atividades).joinedload(Atividade.realizado_por),
-        # Carrega os anexos
         joinedload(Caso.anexos),
-        # ADICIONADO: Carrega a filial associada ao caso
         joinedload(Caso.filial),
-        # ADICIONADO: Carrega a categoria associada ao caso
         joinedload(Caso.categoria)
     ).filter_by(id=caso_id).first()
 
@@ -182,28 +308,6 @@ def buscar_atividade_por_id(sess, atividade_id):
     return sess.query(Atividade).options(
         joinedload(Atividade.realizado_por)
     ).filter_by(id=atividade_id).first()
-
-# Adicione estas duas novas classes ao seu database.py
-
-class Categoria(Base):
-    __tablename__ = 'categorias'
-    id = Column(Integer, primary_key=True)
-    nome = Column(String(100), unique=True, nullable=False)
-
-    # Relacionamentos
-    atividades_padrao = relationship("AtividadePadrao", back_populates="categoria", cascade="all, delete-orphan")
-    casos = relationship("Caso", back_populates="categoria")
-
-class AtividadePadrao(Base):
-    __tablename__ = 'atividades_padrao'
-    id = Column(Integer, primary_key=True)
-    descricao = Column(Text, nullable=False)
-    
-    # Chave estrangeira para ligar à categoria
-    categoria_id = Column(Integer, ForeignKey('categorias.id'), nullable=False)
-    
-    # Relacionamento
-    categoria = relationship("Categoria", back_populates="atividades_padrao")
 
 def buscar_todos_usuarios(sess):
     return sess.query(Usuario).order_by(Usuario.nome_completo).all()
@@ -228,43 +332,18 @@ def atualizar_usuario(sess, user_id, novos_dados):
         return False
     
 def atualizar_relatorio(sess, caso_id, novos_dados):
-    """
-    Atualiza os dados de um relatório (caso) existente no banco de dados.
-    """
     try:
-        # Busca o caso que queremos atualizar.
         caso = sess.get(Caso, caso_id)
         if not caso:
-            return False # Retorna falha se o caso não for encontrado.
-
-        # Itera sobre o dicionário de novos dados e atualiza o objeto.
+            return False
         for campo, valor in novos_dados.items():
             setattr(caso, campo, valor)
-        
         return True
     except Exception as e:
         print(f"ERRO ao atualizar relatório: {e}")
         return False
     
-# Adiona anexos relacionados a casos
-
-class Anexo(Base):
-    __tablename__ = 'anexos'
-    id = Column(Integer, primary_key=True)
-    nome_original = Column(String(255), nullable=False)
-    nome_seguro = Column(String(255), unique=True, nullable=False)
-    caminho = Column(String(512), nullable=False)
-    data_upload = Column(String(20), nullable=False, default=lambda: datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-    
-    # Chave estrangeira para ligar o anexo a um caso
-    caso_id = Column(Integer, ForeignKey('casos.id'), nullable=False)
-    
-    # Relacionamento que permite aceder ao objeto 'Caso' a partir de um 'Anexo'
-    caso = relationship("Caso", back_populates="anexos")
-
-
 def adicionar_anexo(sess, caso_id, nome_original, nome_seguro, caminho):
-    """Cria o registo de um novo anexo no banco de dados."""
     try:
         novo_anexo = Anexo(
             caso_id=caso_id,
@@ -278,18 +357,14 @@ def adicionar_anexo(sess, caso_id, nome_original, nome_seguro, caminho):
         print(f"ERRO ao adicionar anexo: {e}")
         return False
 
-# Adicione este novo conjunto de funções ao seu database.py
-
+# --- Funções CRUD para Categoria ---
 def buscar_todas_categorias(sess):
-    """Busca todas as categorias, ordenadas por nome."""
     return sess.query(Categoria).order_by(Categoria.nome).all()
 
 def buscar_categoria_por_id(sess, categoria_id):
-    """Busca uma única categoria pelo seu ID."""
     return sess.get(Categoria, categoria_id)
 
 def adicionar_categoria(sess, nome):
-    """Adiciona uma nova categoria."""
     try:
         nova_categoria = Categoria(nome=nome)
         sess.add(nova_categoria)
@@ -299,7 +374,6 @@ def adicionar_categoria(sess, nome):
         return False
 
 def atualizar_categoria(sess, categoria_id, nome):
-    """Atualiza o nome de uma categoria existente."""
     try:
         categoria = sess.get(Categoria, categoria_id)
         if categoria:
@@ -311,7 +385,6 @@ def atualizar_categoria(sess, categoria_id, nome):
         return False
 
 def deletar_categoria(sess, categoria_id):
-    """Deleta uma categoria e todas as atividades padrão associadas a ela."""
     try:
         categoria = sess.get(Categoria, categoria_id)
         if categoria:
@@ -322,16 +395,14 @@ def deletar_categoria(sess, categoria_id):
         print(f"ERRO ao deletar categoria: {e}")
         return False
 
+# --- Funções CRUD para Filial ---
 def buscar_todas_filiais(sess):
-    """Busca todas as filiais, ordenadas por nome."""
     return sess.query(Filial).order_by(Filial.nome).all()
 
 def buscar_filial_por_id(sess, filial_id):
-    """Busca uma única filial pelo seu ID."""
     return sess.get(Filial, filial_id)
 
 def adicionar_filial(sess, nome, cidade):
-    """Adiciona uma nova filial."""
     try:
         nova_filial = Filial(nome=nome, cidade=cidade)
         sess.add(nova_filial)
@@ -341,7 +412,6 @@ def adicionar_filial(sess, nome, cidade):
         return False
 
 def atualizar_filial(sess, filial_id, nome, cidade):
-    """Atualiza os dados de uma filial existente."""
     try:
         filial = sess.get(Filial, filial_id)
         if filial:
@@ -354,7 +424,6 @@ def atualizar_filial(sess, filial_id, nome, cidade):
         return False
 
 def deletar_filial(sess, filial_id):
-    """Deleta uma filial. ATENÇÃO: Pode falhar se houver relatórios associados."""
     try:
         filial = sess.get(Filial, filial_id)
         if filial:
@@ -363,68 +432,14 @@ def deletar_filial(sess, filial_id):
         return False
     except Exception as e:
         print(f"ERRO ao deletar filial: {e}")
-        return False    
-    
-# Adicione ou substitua esta função no seu database.py
+        return False 
 
-def criar_caso_com_atividades_padrao(sess, categoria_id, filial_id, realizado_por_id):
-    """
-    Cria um novo Caso numa Filial específica e o popula com as Atividades Padrão
-    da Categoria selecionada. Retorna o ID do novo Caso.
-    """
-    try:
-        # 1. Busca os dados necessários
-        categoria = sess.query(Categoria).options(joinedload(Categoria.atividades_padrao)).filter_by(id=categoria_id).one()
-        filial = sess.get(Filial, filial_id)
-
-        # 2. Cria o novo Caso (Relatório)
-        timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S%f")
-        novo_caso = Caso(
-            titulo=f"Novo Relatório - {categoria.nome} ({filial.nome})",
-            numero_relatorio=f"REL-{timestamp}",
-            tipo=categoria.nome,
-            data_inicio=str(datetime.date.today()),
-            status="Em Elaboração",
-            categoria_id=categoria_id,
-            filial_id=filial_id  # <-- Guardando a Filial!
-        )
-        sess.add(novo_caso)
-        
-        # 3. Cria as Atividades reais baseadas nas Atividades Padrão
-        if categoria.atividades_padrao:
-            for atividade_padrao in categoria.atividades_padrao:
-                nova_atividade = Atividade(
-                    caso=novo_caso,
-                    atividade_desc=atividade_padrao.descricao,
-                    situacao="Pendente",
-                    realizado_por_id=realizado_por_id,
-                    data_registro=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                )
-                sess.add(nova_atividade)
-        
-        sess.flush()
-        return novo_caso.id
-
-    except Exception as e:
-        print(f"ERRO ao criar caso com atividades padrão: {e}")
-        return None    
-
-# Adicione esta nova função ao seu arquivo database.py
-
+# --- Funções de Histórico ---
 def buscar_historico_atividade_na_filial(sess, atividade_atual):
-    """
-    Busca o histórico das últimas 3 ocorrências de uma atividade na mesma filial.
-    
-    Recebe o objeto da atividade ATUAL para usar como referência.
-    Retorna uma lista de objetos de atividades ANTERIORES.
-    """
     try:
-        # Pega as "coordenadas" da atividade atual
         descricao_alvo = atividade_atual.atividade_desc
         filial_alvo_id = atividade_atual.caso.filial_id
         caso_atual_id = atividade_atual.caso.id
-
-        # Constrói a consulta de histórico
         historico = sess.query(Atividade)\
             .join(Atividade.caso)\
             .options(joinedload(Atividade.caso)) \
@@ -436,28 +451,15 @@ def buscar_historico_atividade_na_filial(sess, atividade_atual):
             .order_by(Caso.id.desc())\
             .limit(3)\
             .all()
-        
         return historico
-
     except Exception as e:
         print(f"ERRO ao buscar histórico da atividade: {e}")
-        return [] # Retorna uma lista vazia em caso de erro
-
-# Adicione esta nova função ao seu arquivo database.py
+        return []
 
 def buscar_historico_atividade_global(sess, atividade_atual):
-    """
-    Busca o histórico das últimas 5 ocorrências de uma atividade em QUALQUER filial.
-    
-    Recebe o objeto da atividade ATUAL para usar como referência.
-    Retorna uma lista de objetos de atividades ANTERIORES.
-    """
     try:
-        # Pega as "coordenadas" da atividade atual
         descricao_alvo = atividade_atual.atividade_desc
         caso_atual_id = atividade_atual.caso.id
-
-        # Constrói a consulta de histórico global
         historico = sess.query(Atividade)\
             .join(Atividade.caso)\
             .join(Caso.filial)\
@@ -472,12 +474,10 @@ def buscar_historico_atividade_global(sess, atividade_atual):
             .order_by(Caso.id.desc())\
             .limit(5)\
             .all()
-            
         return historico
-
     except Exception as e:
         print(f"ERRO ao buscar histórico global da atividade: {e}")
         return []
 
 if __name__ == '__main__':
-    inicializar_banco()
+    inicializar_banco()        

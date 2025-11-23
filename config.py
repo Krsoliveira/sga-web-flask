@@ -9,13 +9,22 @@ LISTA_ATIVIDADES = [
     "Serviços de pesagem para terceiros"
 ]
 
+# Lista de opções para o campo "Situação"
+# A lógica do PDF vai procurar por palavras-chave como "CONFORME" ou "IRREGULAR"
+LISTA_SITUACAO = [
+    "SEM IRREGULARIDADES",
+    "SEM IRREGULARIDADES COM RESSALVA",
+    "IRREGULARIDADE LEVE",
+    "IRREGULARIDADE GRAVE",
+    "FRAUDE"
+]
+
 # Lista de opções para o dropdown de situação das atividades
 LISTA_SITUACAO = ["ABERTO", "FINALIZADO", "AGUARD. JUSTIF.", "PENDENTE"]
 
 # Lista de opções para o dropdown de níveis de acesso de usuários
 LISTA_NIVEIS_ACESSO = ["Junior", "Pleno", "Senior", "Manager", "Admin"]
 
-# ... (outras listas) ...
 
 # Lista de opções para o dropdown de papéis de usuários
 LISTA_ROLES = ["Auditor", "Manager", "Admin"]

@@ -104,7 +104,10 @@ class Atividade(Base):
     situacao = Column(String(50))
     realizado_por_id = Column(Integer, ForeignKey('usuarios.id'))
     periodo_inicio = Column(String(20), nullable=True) 
-    periodo_fim = Column(String(20), nullable=True)    
+    periodo_fim = Column(String(20), nullable=True) 
+    extensao_exames = Column(Text, nullable=True)      # Ex: "10 notas fiscais"
+    criterio_amostragem = Column(Text, nullable=True)  # Ex: "Aleatório", "Valor > 10k"
+    
     
     caso = relationship("Caso", back_populates="atividades")
     realizado_por = relationship("Usuario", back_populates="atividades_realizadas")

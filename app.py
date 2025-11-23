@@ -1,19 +1,26 @@
 import os
 from datetime import date, datetime
 from dotenv import load_dotenv
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, g, send_from_directory
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, g, send_from_directory, make_response
 from functools import wraps
 import database as db
 import config
 import pprint
 from werkzeug.utils import secure_filename
-import pdf_generator  
-from flask import make_response  
+import pdf_generator # Importando o nosso motor de PDF
 
 load_dotenv()
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.secret_key = os.getenv('SECRET_KEY', 'um-segredo-muito-forte-para-desenvolvimento')
+
+LISTA_SITUACAO_HARDCODED = [
+    "SEM IRREGULARIDADES",
+    "SEM IRREGULARIDADES COM RESSALVA",
+    "IRREGULARIDADE LEVE",
+    "IRREGULARIDADE GRAVE",
+    "FRAUDE"
+]    
 
 # =======================================================
 # ==== CARREGADOR GLOBAL DE UTILIZADOR (LÓGICA NOVA) ====
@@ -120,7 +127,7 @@ def dashboard():
         lista_de_casos = db.buscar_casos(sess)
         todas_categorias = db.buscar_todas_categorias(sess)
         todas_filiais = db.buscar_todas_filiais(sess)
-       
+        
     return render_template('dashboard.html', 
                            casos=lista_de_casos, 
                            categorias=todas_categorias, 
@@ -172,10 +179,8 @@ def ver_relatorio(id_caso):
     return render_template('relatorio.html', 
                            caso=dados_caso, 
                            atividades=lista_atividades, 
-                           opcoes_atividade=config.LISTA_ATIVIDADES, 
-                           opcoes_situacao=config.LISTA_SITUACAO)
-
-# Adicione esta nova rota ao seu app.py
+                           opcoes_atividade=config.LISTA_ATIVIDADES,                           
+                           opcoes_situacao=LISTA_SITUACAO_HARDCODED)
 
 @app.route('/relatorio/<int:id_caso>/pdf')
 @login_required
@@ -204,7 +209,9 @@ def gerar_pdf_relatorio(id_caso):
         #    'Content-Type' diz: "Isto é um ficheiro PDF".
         response.headers['Content-Type'] = 'application/pdf'
         #    'Content-Disposition' diz: "Trate isto como um anexo para download e sugira este nome de ficheiro".
-        response.headers['Content-Disposition'] = f'attachment; filename=relatorio_{caso.numero_relatorio or caso.id}.pdf'
+        # Ajuste para garantir que o nome do arquivo seja seguro
+        safe_filename = secure_filename(f'relatorio_{caso.numero_relatorio_display}.pdf')
+        response.headers['Content-Disposition'] = f'attachment; filename={safe_filename}'
         
         return response
 
@@ -227,7 +234,9 @@ def adicionar_atividade(id_caso):
         'data_registro': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         'caso_id': id_caso,
         'periodo_inicio': request.form.get('periodo_inicio'), 
-        'periodo_fim': request.form.get('periodo_fim')
+        'periodo_fim': request.form.get('periodo_fim'),        
+        'extensao_exames': request.form.get('extensao_exames'),
+        'criterio_amostragem': request.form.get('criterio_amostragem')
     }
     with db.get_db() as sess:
         sucesso = db.salvar_atividade(sess, dados_formulario)
@@ -341,71 +350,6 @@ def download_anexo(nome_seguro):
         # Redireciona de volta para a última página visitada ou para o dashboard
         return redirect(request.referrer or url_for('dashboard'))
     
-# Adicione estas novas rotas ao seu app.py, pode ser dentro da secção de Admin.
-
-# Rota para LISTAR todas as categorias
-@app.route('/admin/categorias')
-@login_required
-@role_required('Admin', 'Manager')
-def gestao_categorias():
-    with db.get_db() as sess:
-        categorias = db.buscar_todas_categorias(sess)
-    return render_template('gestao_categorias.html', categorias=categorias)
-
-# Rota para ADICIONAR uma nova categoria (mostra o formulário e processa)
-@app.route('/admin/categoria/nova', methods=['GET', 'POST'])
-@login_required
-@role_required('Admin', 'Manager')
-def adicionar_categoria_route():
-    if request.method == 'POST':
-        nome = request.form.get('nome')
-        if nome:
-            with db.get_db() as sess:
-                sucesso = db.adicionar_categoria(sess, nome)
-            if sucesso:
-                flash('Categoria criada com sucesso!', 'success')
-                return redirect(url_for('gestao_categorias'))
-            else:
-                flash('Erro ao criar categoria. O nome já pode existir.', 'danger')
-    return render_template('form_categoria.html')
-
-# Rota para EDITAR uma categoria existente (mostra o formulário e processa)
-@app.route('/admin/categoria/editar/<int:categoria_id>', methods=['GET', 'POST'])
-@login_required
-@role_required('Admin', 'Manager')
-def editar_categoria_route(categoria_id):
-    with db.get_db() as sess:
-        categoria = db.buscar_categoria_por_id(sess, categoria_id)
-    if not categoria:
-        flash('Categoria não encontrada.', 'danger')
-        return redirect(url_for('gestao_categorias'))
-        
-    if request.method == 'POST':
-        nome = request.form.get('nome')
-        if nome:
-            with db.get_db() as sess:
-                sucesso = db.atualizar_categoria(sess, categoria_id, nome)
-            if sucesso:
-                flash('Categoria atualizada com sucesso!', 'success')
-                return redirect(url_for('gestao_categorias'))
-            else:
-                flash('Erro ao atualizar categoria.', 'danger')
-
-    return render_template('form_categoria.html', categoria=categoria)
-
-# Rota para DELETAR uma categoria
-@app.route('/admin/categoria/deletar/<int:categoria_id>', methods=['POST'])
-@login_required
-@role_required('Admin', 'Manager')
-def deletar_categoria_route(categoria_id):
-    with db.get_db() as sess:
-        sucesso = db.deletar_categoria(sess, categoria_id)
-    if sucesso:
-        flash('Categoria deletada com sucesso!', 'success')
-    else:
-        flash('Erro ao deletar categoria.', 'danger')
-    return redirect(url_for('gestao_categorias'))
-
 @app.route('/relatorio/<int:id_caso>/editar', methods=['GET', 'POST'])
 @login_required
 def editar_relatorio(id_caso):
@@ -518,43 +462,68 @@ def editar_usuario(user_id):
    
     return render_template('editar_usuario.html', usuario_para_editar=usuario_para_editar, roles=config.LISTA_ROLES, gerentes=lista_gerentes)
 
-@app.route('/atividade/<int:id_atividade>/editar', methods=['GET', 'POST'])
-@login_required 
-def editar_atividade(id_atividade):
+# Rota para LISTAR todas as categorias
+@app.route('/admin/categorias')
+@login_required
+@role_required('Admin', 'Manager')
+def gestao_categorias():
     with db.get_db() as sess:
-        atividade_atual = db.buscar_atividade_por_id(sess, id_atividade)
-    if not atividade_atual:
-        flash('Atividade não encontrada.', 'danger')
-        return redirect(url_for('dashboard'))
+        categorias = db.buscar_todas_categorias(sess)
+    return render_template('gestao_categorias.html', categorias=categorias)
 
+# Rota para ADICIONAR uma nova categoria (mostra o formulário e processa)
+@app.route('/admin/categoria/nova', methods=['GET', 'POST'])
+@login_required
+@role_required('Admin', 'Manager')
+def adicionar_categoria_route():
     if request.method == 'POST':
-        dados_do_formulario = {
-            'atividade_desc': request.form.get('atividade_desc'),
-            'testes_realizados': request.form.get('testes_realizados'),
-            'observacao_resumo': request.form.get('observacao_resumo'),
-            'nao_conformidade': request.form.get('nao_conformidade'),
-            'situacao': request.form.get('situacao'),
-            'recomendacao': request.form.get('recomendacao'),
-            'periodo_inicio': request.form.get('periodo_inicio'),
-            'periodo_fim': request.form.get('periodo_fim')
-        }
-        campos_para_atualizar = {k: v for k, v in dados_do_formulario.items() if str(v or '') != str(getattr(atividade_atual, k) or '')}
-
-        if campos_para_atualizar:
+        nome = request.form.get('nome')
+        if nome:
             with db.get_db() as sess:
-                # Precisamos de uma função para atualizar atividades
-                sucesso = db.atualizar_atividade(sess, id_atividade, campos_para_atualizar)
+                sucesso = db.adicionar_categoria(sess, nome)
             if sucesso:
-                flash(f'{len(campos_para_atualizar)} campo(s) atualizado(s) com sucesso!', 'success')
+                flash('Categoria criada com sucesso!', 'success')
+                return redirect(url_for('gestao_categorias'))
             else:
-                flash('Ocorreu um erro ao atualizar a atividade.', 'danger')
-        else:
-            flash('Nenhuma alteração foi detectada.', 'info')
-        return redirect(url_for('ver_relatorio', id_caso=atividade_atual.caso_id))
-    
+                flash('Erro ao criar categoria. O nome já pode existir.', 'danger')
+    return render_template('form_categoria.html')
+
+# Rota para EDITAR uma categoria existente (mostra o formulário e processa)
+@app.route('/admin/categoria/editar/<int:categoria_id>', methods=['GET', 'POST'])
+@login_required
+@role_required('Admin', 'Manager')
+def editar_categoria_route(categoria_id):
     with db.get_db() as sess:
-        caso = db.buscar_caso_por_id(sess, atividade_atual.caso_id)
-    return render_template('editar_atividade.html', atividade=atividade_atual, caso=caso, opcoes_atividade=config.LISTA_ATIVIDADES, opcoes_situacao=config.LISTA_SITUACAO)
+        categoria = db.buscar_categoria_por_id(sess, categoria_id)
+    if not categoria:
+        flash('Categoria não encontrada.', 'danger')
+        return redirect(url_for('gestao_categorias'))
+        
+    if request.method == 'POST':
+        nome = request.form.get('nome')
+        if nome:
+            with db.get_db() as sess:
+                sucesso = db.atualizar_categoria(sess, categoria_id, nome)
+            if sucesso:
+                flash('Categoria atualizada com sucesso!', 'success')
+                return redirect(url_for('gestao_categorias'))
+            else:
+                flash('Erro ao atualizar categoria.', 'danger')
+
+    return render_template('form_categoria.html', categoria=categoria)
+
+# Rota para DELETAR uma categoria
+@app.route('/admin/categoria/deletar/<int:categoria_id>', methods=['POST'])
+@login_required
+@role_required('Admin', 'Manager')
+def deletar_categoria_route(categoria_id):
+    with db.get_db() as sess:
+        sucesso = db.deletar_categoria(sess, categoria_id)
+    if sucesso:
+        flash('Categoria deletada com sucesso!', 'success')
+    else:
+        flash('Erro ao deletar categoria.', 'danger')
+    return redirect(url_for('gestao_categorias'))
 
 # Rota para LISTAR todas as filiais
 @app.route('/admin/filiais')
@@ -621,6 +590,46 @@ def deletar_filial_route(filial_id):
         flash('Erro ao deletar filial. Verifique se não existem relatórios associados a ela.', 'danger')
     return redirect(url_for('gestao_filiais'))
 
+@app.route('/atividade/<int:id_atividade>/editar', methods=['GET', 'POST'])
+@login_required 
+def editar_atividade(id_atividade):
+    with db.get_db() as sess:
+        atividade_atual = db.buscar_atividade_por_id(sess, id_atividade)
+    if not atividade_atual:
+        flash('Atividade não encontrada.', 'danger')
+        return redirect(url_for('dashboard'))
+
+    if request.method == 'POST':
+        dados_do_formulario = {
+            'atividade_desc': request.form.get('atividade_desc'),
+            'testes_realizados': request.form.get('testes_realizados'),
+            'observacao_resumo': request.form.get('observacao_resumo'),
+            'nao_conformidade': request.form.get('nao_conformidade'),
+            'situacao': request.form.get('situacao'),
+            'recomendacao': request.form.get('recomendacao'),
+            'periodo_inicio': request.form.get('periodo_inicio'),
+            'periodo_fim': request.form.get('periodo_fim'),            
+            'extensao_exames': request.form.get('extensao_exames'),
+            'criterio_amostragem': request.form.get('criterio_amostragem')
+        }
+        campos_para_atualizar = {k: v for k, v in dados_do_formulario.items() if str(v or '') != str(getattr(atividade_atual, k) or '')}
+
+        if campos_para_atualizar:
+            with db.get_db() as sess:
+                # Precisamos de uma função para atualizar atividades
+                sucesso = db.atualizar_atividade(sess, id_atividade, campos_para_atualizar)
+            if sucesso:
+                flash(f'{len(campos_para_atualizar)} campo(s) atualizado(s) com sucesso!', 'success')
+            else:
+                flash('Ocorreu um erro ao atualizar a atividade.', 'danger')
+        else:
+            flash('Nenhuma alteração foi detectada.', 'info')
+        return redirect(url_for('ver_relatorio', id_caso=atividade_atual.caso_id))
+    
+    with db.get_db() as sess:
+        caso = db.buscar_caso_por_id(sess, atividade_atual.caso_id)
+    return render_template('editar_atividade.html', atividade=atividade_atual, caso=caso, opcoes_atividade=config.LISTA_ATIVIDADES, opcoes_situacao=LISTA_SITUACAO_HARDCODED)
+
 # --- ROTAS DE API ---
 @app.route('/api/get-user-name/<string:codigo>')
 def get_user_name(codigo):
@@ -673,7 +682,7 @@ def get_historico_atividade_filial(id_atividade_atual):
             historico_formatado = []
             for at_hist in atividades_historicas:
                 historico_formatado.append({
-                    'relatorio_numero': at_hist.caso.numero_relatorio,
+                    'relatorio_numero': at_hist.caso.numero_relatorio_display, # Usando a propriedade formatada
                     'data_registro': at_hist.data_registro,
                     'realizado_por': at_hist.realizado_por.nome_completo if at_hist.realizado_por else 'N/A',
                     'observacao_resumo': at_hist.observacao_resumo,
@@ -688,8 +697,6 @@ def get_historico_atividade_filial(id_atividade_atual):
     except Exception as e:
         print(f"ERRO na API de histórico: {e}")
         return jsonify({'error': 'Ocorreu um erro interno ao buscar o histórico.'}), 500 
-
-# Adicione esta nova rota ao seu app.py, logo após a outra API de histórico
 
 @app.route('/api/atividade/<int:id_atividade_atual>/historico/global')
 @login_required
@@ -711,7 +718,7 @@ def get_historico_atividade_global(id_atividade_atual):
             historico_formatado = []
             for at_hist in atividades_historicas:
                 historico_formatado.append({
-                    'relatorio_numero': at_hist.caso.numero_relatorio,
+                    'relatorio_numero': at_hist.caso.numero_relatorio_display, # Usando a propriedade formatada
                     'filial_nome': at_hist.caso.filial.nome if at_hist.caso.filial else 'N/A', # A informação extra que precisamos!
                     'data_registro': at_hist.data_registro,
                     'realizado_por': at_hist.realizado_por.nome_completo if at_hist.realizado_por else 'N/A',

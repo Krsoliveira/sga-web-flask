@@ -102,3 +102,45 @@
 a.btn, a.dropdown-item, a.nav-link {
     text-decoration: none;
 }
+
+/* ================================================================ */
+/* ==== ESTILOS DA LANDING PAGE (HOME) ==== */
+/* ================================================================ */
+
+/* Configuração do fundo da Landing Page (similar ao Login, mas focado no conteúdo) */
+.landing-page {
+    background-color: var(--bs-primary);
+    background-image: url('../images/background.jpg'); /* Certifique-se que a imagem existe */
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed; /* Efeito parallax simples */
+    /* O overlay aqui é mais escuro para garantir que o texto branco seja legível */
+    background-blend-mode: multiply; 
+    min-height: 100vh;
+    position: relative;
+}
+
+/* Garante que o conteúdo ocupe a altura total */
+.hero-section {
+    min-height: 100vh;
+    padding-top: 60px; /* Espaço para a navbar */
+    padding-bottom: 40px;
+}
+
+/* Estilo dos cartões de funcionalidades */
+.feature-card {
+    background-color: rgba(255, 255, 255, 0.05); /* Quase transparente */
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(5px);
+    transition: transform 0.3s ease, background-color 0.3s ease;
+}
+
+.feature-card:hover {
+    transform: translateY(-5px); /* Levanta ligeiramente ao passar o rato */
+    background-color: rgba(255, 255, 255, 0.1);
+    border-color: var(--bs-link-color);
+}
+
+.icon-box i {
+    color: var(--bs-link-color); /* Usa o azul de destaque definido no :root */
+}

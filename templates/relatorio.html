@@ -22,7 +22,7 @@
             <span class="text-muted">Relatório Nº: {{ caso.numero_relatorio_display }}</span>
         </div>
         <div>
-            <span class="badge
+            <span class="badge 
                 {% if caso.status == 'Aprovado' %} bg-success
                 {% elif caso.status == 'Pendente de Revisão' %} bg-warning
                 {% elif caso.status == 'Em Elaboração' %} bg-info
@@ -51,7 +51,7 @@
 
     {# CONTEÚDO DINÂMICO DAS ABAS (PAINÉIS) #}
     <div class="tab-content" id="pills-tabContent">
-
+        
         <div class="tab-pane fade show active" id="pills-geral" role="tabpanel" aria-labelledby="pills-geral-tab">
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
@@ -83,17 +83,8 @@
                 <div class="card-header"><h5 class="mb-0">Registrar Nova Atividade</h5></div>
                 <div class="card-body">
                     <form action="{{ url_for('adicionar_atividade', id_caso=caso.id) }}" method="POST">
-
-                        <div class="mb-3">
-                            <label for="atividade_desc" class="form-label">Descrição da Atividade</label>
-                            <select class="form-select" id="atividade_desc" name="atividade_desc" required>
-                                <option selected disabled value="">Selecione...</option>
-                                {% for opcao in opcoes_atividade %}
-                                    <option value="{{ opcao }}">{{ opcao }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-
+                        <div class="mb-3"><label for="atividade_desc" class="form-label">Descrição da Atividade</label><select class="form-select" id="atividade_desc" name="atividade_desc" required><option selected disabled value="">Selecione...</option>{% for opcao in opcoes_atividade %}<option value="{{ opcao }}">{{ opcao }}</option>{% endfor %}</select></div>
+                        
                         <div class="row mb-3">
                             <div class="col-md-6">
                                 <label for="periodo_inicio" class="form-label">Período de Análise - Início</label>
@@ -105,48 +96,35 @@
                             </div>
                         </div>
 
-                        <div class="mb-3">
-                            <label for="testes_realizados" class="form-label">Testes Realizados</label>
-                            <textarea class="form-control" id="testes_realizados" name="testes_realizados" rows="3" required></textarea>
-                        </div>
-
-                        <div class="mb-3">
-                            <label for="observacao_resumo" class="form-label">Observação / Resumo</label>
-                            <textarea class="form-control" id="observacao_resumo" name="observacao_resumo" rows="3"></textarea>
-                        </div>
-
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="nao_conformidade" class="form-label">Não Conformidade</label>
-                                <input type="text" class="form-control" id="nao_conformidade" name="nao_conformidade">
+                        <div class="mb-3"><label for="testes_realizados" class="form-label">Testes Realizados</label><textarea class="form-control" id="testes_realizados" name="testes_realizados" rows="3" required></textarea></div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="extensao_exames" class="form-label">Extensão dos Exames</label>
+                                <input type="text" class="form-control" id="extensao_exames" name="extensao_exames" placeholder="Ex: 15 amostras, 100% dos itens...">
                             </div>
-                            <div class="col-md-6 mb-3">
-                                <label for="situacao" class="form-label">Situação</label>
-                                <select class="form-select" id="situacao" name="situacao" required>
-                                    {% for opcao in opcoes_situacao %}
-                                        <option value="{{ opcao }}">{{ opcao }}</option>
-                                    {% endfor %}
-                                </select>
+                            <div class="col-md-6">
+                                <label for="criterio_amostragem" class="form-label">Critério de Amostragem</label>
+                                <input type="text" class="form-control" id="criterio_amostragem" name="criterio_amostragem" placeholder="Ex: Aleatório, Itens de alto valor...">
                             </div>
                         </div>
 
-                        <div class="mb-3">
-                            <label for="recomendacao" class="form-label">Recomendação</label>
-                            <textarea class="form-control" id="recomendacao" name="recomendacao" rows="2"></textarea>
-                        </div>
-
+                        <div class="mb-3"><label for="observacao_resumo" class="form-label">Observação / Resumo</label><textarea class="form-control" id="observacao_resumo" name="observacao_resumo" rows="3"></textarea></div>
+                        
+                        <div class="row"><div class="col-md-6 mb-3"><label for="nao_conformidade" class="form-label">Não Conformidade</label><input type="text" class="form-control" id="nao_conformidade" name="nao_conformidade"></div><div class="col-md-6 mb-3"><label for="situacao" class="form-label">Situação</label><select class="form-select" id="situacao" name="situacao" required>{% for opcao in opcoes_situacao %}<option value="{{ opcao }}">{{ opcao }}</option>{% endfor %}</select></div></div>
+                        <div class="mb-3"><label for="recomendacao" class="form-label">Recomendação</label><textarea class="form-control" id="recomendacao" name="recomendacao" rows="2"></textarea></div>
                         <button type="submit" class="btn btn-primary">Salvar Atividade</button>
-
                     </form>
-                    </div>
+                </div>
             </div>
+
             <div class="card mt-4">
                 <div class="card-header">Atividades Registradas</div>
                 <div class="card-body">
                     {% if atividades %}
                     <div class="list-group">
                         {% for atividade in atividades %}
-                            <button type="button" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center view-activity-btn"
+                            <button type="button" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center view-activity-btn" 
                                     data-activity-id="{{ atividade.id }}"
                                     data-edit-url="{{ url_for('editar_atividade', id_atividade=atividade.id) }}">
                                 <div>
@@ -163,7 +141,7 @@
                 </div>
             </div>
         </div>
-
+        
         <div class="tab-pane fade" id="pills-anexos" role="tabpanel" aria-labelledby="pills-anexos-tab">
             <div class="card">
                 <div class="card-header"><h5 class="mb-0">Enviar Novo Anexo</h5></div>
@@ -204,9 +182,9 @@
             </div>
         </div>
 
-    </div>
-
-<div class="modal fade" id="activityDetailModal" tabindex="-1" aria-labelledby="activityDetailModalLabel" aria-hidden="true">
+    </div> 
+    
+    <div class="modal fade" id="activityDetailModal" tabindex="-1" aria-labelledby="activityDetailModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
@@ -215,10 +193,17 @@
                 </div>
                 <div class="modal-body">
                     <p><strong>Ponto de Auditoria:</strong> <span id="modal-atividade_desc"></span></p>
+                    
                     <div class="row mb-2">
                         <div class="col"><strong>Período Análise (Início):</strong> <span id="modal-periodo_inicio"></span></div>
                         <div class="col"><strong>Período Análise (Fim):</strong> <span id="modal-periodo_fim"></span></div>
                     </div>
+
+                    <div class="row mb-2">
+                        <div class="col"><strong>Extensão dos Exames:</strong> <br><span id="modal-extensao_exames"></span></div>
+                        <div class="col"><strong>Critério de Amostragem:</strong> <br><span id="modal-criterio_amostragem"></span></div>
+                    </div>
+
                     <p><strong>Testes Realizados:</strong></p>
                     <pre id="modal-testes_realizados"></pre>
                     <p><strong>Observação / Resumo:</strong></p>
@@ -247,51 +232,51 @@ document.addEventListener('DOMContentLoaded', function () {
     const activityModal = new bootstrap.Modal(document.getElementById('activityDetailModal'));
     const viewButtons = document.querySelectorAll('.view-activity-btn');
     const editButton = document.getElementById('modal-edit-btn');
-
+    
     viewButtons.forEach(button => {
         button.addEventListener('click', function () {
             const activityId = this.dataset.activityId;
             const editUrl = this.dataset.editUrl;
-
+            
             editButton.onclick = () => { window.location.href = editUrl; };
-
+            
             // Limpa o modal
             document.getElementById('modal-atividade_desc').textContent = 'A carregar...';
-            document.getElementById('modal-periodo_inicio').textContent = '...'; // Limpa data
-            document.getElementById('modal-periodo_fim').textContent = '...';    // Limpa data
+            document.getElementById('modal-periodo_inicio').textContent = '...';
+            document.getElementById('modal-periodo_fim').textContent = '...';
+            document.getElementById('modal-extensao_exames').textContent = '...';
+            document.getElementById('modal-criterio_amostragem').textContent = '...';
             document.getElementById('modal-testes_realizados').textContent = '...';
             document.getElementById('modal-observacao_resumo').textContent = '...';
             document.getElementById('modal-nao_conformidade').textContent = '...';
             document.getElementById('modal-recomendacao').textContent = '...';
             document.getElementById('modal-realizado_por_nome').textContent = '...';
             document.getElementById('modal-situacao').textContent = '...';
-
+            
             fetch(`/api/atividade/${activityId}`)
                 .then(response => response.ok ? response.json() : Promise.reject('Erro ao buscar dados.'))
                 .then(data => {
-                    // Preenche o modal com os dados recebidos da API
                     document.getElementById('modal-atividade_desc').textContent = data.atividade_desc || 'Não informado';
-
-                    // ================================================================
-                    // ==== ALTERAÇÃO AQUI: Preenchendo as datas do período ====
-                    // ================================================================
                     document.getElementById('modal-periodo_inicio').textContent = data.periodo_inicio || 'Não informado';
                     document.getElementById('modal-periodo_fim').textContent = data.periodo_fim || 'Não informado';
-                    // ================================================================
+                    
+                    // Preenchendo os novos campos
+                    document.getElementById('modal-extensao_exames').textContent = data.extensao_exames || 'Não informado';
+                    document.getElementById('modal-criterio_amostragem').textContent = data.criterio_amostragem || 'Não informado';
 
                     document.getElementById('modal-testes_realizados').textContent = data.testes_realizados || 'Não informado';
                     document.getElementById('modal-observacao_resumo').textContent = data.observacao_resumo || 'Não informado';
                     document.getElementById('modal-nao_conformidade').textContent = data.nao_conformidade || 'Nenhuma';
                     document.getElementById('modal-recomendacao').textContent = data.recomendacao || 'Nenhuma';
                     document.getElementById('modal-realizado_por_nome').textContent = data.realizado_por_nome || 'Desconhecido';
-
+                    
                     const situacaoBadge = document.getElementById('modal-situacao');
                     situacaoBadge.textContent = data.situacao || 'Não informada';
-                    situacaoBadge.className = 'badge';
+                    situacaoBadge.className = 'badge'; 
                     if (data.situacao === 'FINALIZADO') situacaoBadge.classList.add('bg-success');
                     else if (data.situacao === 'PENDENTE') situacaoBadge.classList.add('bg-warning');
                     else situacaoBadge.classList.add('bg-info');
-
+                    
                     activityModal.show();
                 })
                 .catch(error => {

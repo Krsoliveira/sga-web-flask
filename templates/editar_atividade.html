@@ -16,6 +16,7 @@
 {% block content %}
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1 class="h3 mb-0">Editar Atividade</h1>
+        
         <div class="btn-group" role="group" aria-label="Histórico da Atividade">
             <button type="button" class="btn btn-outline-info" id="btnVerHistoricoFilial" data-activity-id="{{ atividade.id }}">
                 <i class="fas fa-history"></i> Histórico (Filial)
@@ -28,13 +29,9 @@
 
     <form action="" method="POST">
         <div class="mb-3">
-            <label for="atividade_desc" class="form-label">Descrição da Atividade (Ponto de Auditoria)</label>
-            <select class="form-select" id="atividade_desc" name="atividade_desc" required>
-                <option disabled value="">Selecione um ponto de auditoria...</option>
-                {% for opcao in opcoes_atividade %}
-                <option value="{{ opcao }}" {% if opcao == atividade.atividade_desc %}selected{% endif %}>{{ opcao }}</option>
-                {% endfor %}
-            </select>
+            <label for="atividade_desc" class="form-label fw-bold">Atividade</label>
+            <input type="text" class="form-control bg-light" value="{{ atividade.atividade_desc }}" disabled>
+            <input type="hidden" name="atividade_desc" value="{{ atividade.atividade_desc }}">
         </div>
 
         <div class="row mb-3">
@@ -47,32 +44,37 @@
                 <input type="date" class="form-control" id="periodo_fim" name="periodo_fim" value="{{ atividade.periodo_fim or '' }}">
             </div>
         </div>
+
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <label for="extensao_exames" class="form-label">Extensão dos Exames</label>
+                <input type="text" class="form-control" id="extensao_exames" name="extensao_exames" value="{{ atividade.extensao_exames or '' }}" placeholder="Ex: 100% das notas...">
+            </div>
+            <div class="col-md-6">
+                <label for="criterio_amostragem" class="form-label">Critério de Amostragem</label>
+                <input type="text" class="form-control" id="criterio_amostragem" name="criterio_amostragem" value="{{ atividade.criterio_amostragem or '' }}" placeholder="Ex: Aleatório...">
+            </div>
+        </div>
         <div class="mb-3">
             <label for="testes_realizados" class="form-label">Testes Realizados</label>
-            <textarea class="form-control" id="testes_realizados" name="testes_realizados" rows="3" required>{{ atividade.testes_realizados or '' }}</textarea>
+            <textarea class="form-control" id="testes_realizados" name="testes_realizados" rows="4">{{ atividade.testes_realizados or '' }}</textarea>
         </div>
+
         <div class="mb-3">
-            <label for="observacao_resumo" class="form-label">Observação / Resumo dos Achados</label>
-            <textarea class="form-control" id="observacao_resumo" name="observacao_resumo" rows="3">{{ atividade.observacao_resumo or '' }}</textarea>
+            <label for="observacao_resumo" class="form-label">Observação / Resumo de Situações</label>
+            <textarea class="form-control" id="observacao_resumo" name="observacao_resumo" rows="4" placeholder="Descreva aqui os detalhes, irregularidades encontradas ou observações gerais.">{{ atividade.observacao_resumo or '' }}</textarea>
         </div>
-        <div class="row">
-            <div class="col-md-6 mb-3">
-                <label for="nao_conformidade" class="form-label">Não Conformidade (Opcional)</label>
-                <input type="text" class="form-control" id="nao_conformidade" name="nao_conformidade" value="{{ atividade.nao_conformidade or '' }}">
-            </div>
-            <div class="col-md-6 mb-3">
-                <label for="situacao" class="form-label">Situação</label>
-                <select class="form-select" id="situacao" name="situacao" required>
-                    {% for opcao in opcoes_situacao %}
-                    <option value="{{ opcao }}" {% if opcao == atividade.situacao %}selected{% endif %}>{{ opcao }}</option>
-                    {% endfor %}
-                </select>
-            </div>
+
+        <div class="mb-4">
+            <label for="situacao" class="form-label fw-bold">Situação Final</label>
+            <select class="form-select form-select-lg border-primary" id="situacao" name="situacao" required>
+                <option value="" disabled {% if not atividade.situacao %}selected{% endif %}>Selecione a situação...</option>
+                {% for opcao in opcoes_situacao %}
+                <option value="{{ opcao }}" {% if opcao == atividade.situacao %}selected{% endif %}>{{ opcao }}</option>
+                {% endfor %}
+            </select>
         </div>
-        <div class="mb-3">
-            <label for="recomendacao" class="form-label">Recomendação (Opcional)</label>
-            <textarea class="form-control" id="recomendacao" name="recomendacao" rows="2">{{ atividade.recomendacao or '' }}</textarea>
-        </div>
+
         <div class="d-flex justify-content-end">
             <a href="{{ url_for('ver_relatorio', id_caso=caso.id) }}" class="btn btn-secondary me-2">Cancelar</a>
             <button type="submit" class="btn btn-primary">Salvar Alterações</button>
@@ -83,7 +85,7 @@
         <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="historyModalLabel">Histórico da Atividade</h5>
+                    <h5 class="modal-title" id="historyModalLabel">Histórico</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body" id="historyModalBody">
@@ -96,7 +98,6 @@
     </div>
 {% endblock %}
 
-
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -106,10 +107,12 @@ document.addEventListener('DOMContentLoaded', function () {
     const historyButtonFilial = document.getElementById('btnVerHistoricoFilial');
     const historyButtonGlobal = document.getElementById('btnVerHistoricoGlobal');
 
+    // Função genérica para buscar e exibir o histórico
     function fetchAndShowHistory(activityId, type) {
         let apiUrl = '';
         let modalTitle = '';
 
+        // Define a URL e o Título com base no tipo (filial ou global)
         if (type === 'global') {
             apiUrl = `/api/atividade/${activityId}/historico/global`;
             modalTitle = 'Histórico Global da Atividade';
@@ -126,13 +129,16 @@ document.addEventListener('DOMContentLoaded', function () {
             .then(response => response.ok ? response.json() : Promise.reject('Falha na resposta da rede.'))
             .then(data => {
                 historyModalBody.innerHTML = '';
+                
                 if (data.length === 0) {
                     historyModalBody.innerHTML = '<p class="text-center">Nenhum histórico encontrado.</p>';
                     return;
                 }
 
                 data.forEach(item => {
+                    // Se for global, mostra o nome da filial entre parênteses
                     const filialInfo = type === 'global' ? `(${item.filial_nome})` : '';
+                    
                     const historicoCard = `
                         <div class="card mb-3">
                             <div class="card-header d-flex justify-content-between">
@@ -140,9 +146,7 @@ document.addEventListener('DOMContentLoaded', function () {
                                 <small class="text-muted">Data: ${item.data_registro}</small>
                             </div>
                             <div class="card-body">
-                                <p><strong>Resumo:</strong> ${item.observacao_resumo || 'N/A'}</p>
-                                <p><strong>Não Conformidade:</strong> ${item.nao_conformidade || 'Nenhuma'}</p>
-                                <p><strong>Recomendação:</strong> ${item.recomendacao || 'Nenhuma'}</p>
+                                <p><strong>Obs:</strong> ${item.observacao_resumo || '-'}</p>
                             </div>
                             <div class="card-footer text-muted d-flex justify-content-between">
                                 <span>Situação: <span class="badge bg-info">${item.situacao}</span></span>
@@ -159,13 +163,18 @@ document.addEventListener('DOMContentLoaded', function () {
             });
     }
 
-    historyButtonFilial.addEventListener('click', function() {
-        fetchAndShowHistory(this.dataset.activityId, 'filial');
-    });
+    // Adiciona os eventos de clique
+    if (historyButtonFilial) {
+        historyButtonFilial.addEventListener('click', function() {
+            fetchAndShowHistory(this.dataset.activityId, 'filial');
+        });
+    }
 
-    historyButtonGlobal.addEventListener('click', function() {
-        fetchAndShowHistory(this.dataset.activityId, 'global');
-    });
+    if (historyButtonGlobal) {
+        historyButtonGlobal.addEventListener('click', function() {
+            fetchAndShowHistory(this.dataset.activityId, 'global');
+        });
+    }
 });
 </script>
 {% endblock %}

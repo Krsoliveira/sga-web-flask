@@ -1,15 +1,75 @@
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-    <meta charset="UTF-8">
-    <title>SGA - Início</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-</head>
-<body>
-    <div class="container">
-        <h1>Bem-vindo ao Sistema Gerenciador de Atividades (SGA)</h1>
-        <p>Esta é a página inicial da nossa nova aplicação web.</p>
-        <a href="{{ url_for('login') }}">Ir para a Página de Login</a>
+{% extends "base.html" %}
+
+{% block body_class %}landing-page{% endblock %}
+
+{% block title %}Bem-vindo{% endblock %}
+
+{# Sobrescrevemos o main_content para ter total controle do layout (tela cheia) #}
+{% block main_content %}
+
+    <nav class="navbar navbar-expand-lg navbar-dark fixed-top" style="background-color: transparent !important;">
+        <div class="container">
+            <a class="navbar-brand fw-bold fs-3" href="#">SGA</a>
+            <div class="ms-auto">
+                <a href="{{ url_for('login') }}" class="btn btn-outline-light btn-sm px-4">Login</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="hero-section d-flex align-items-center text-center text-white">
+        <div class="container">
+            <div class="row justify-content-center">
+                <div class="col-lg-8">
+                    <h1 class="display-3 fw-bold mb-3">Gestão de Auditoria Inteligente</h1>
+                    <p class="lead mb-5 text-light opacity-75">
+                        Padronize processos, gerencie filiais e gere relatórios profissionais com eficiência e segurança.
+                        O controle total da sua operação em um só lugar.
+                    </p>
+                    <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
+                        <a href="{{ url_for('login') }}" class="btn btn-primary btn-lg px-5 gap-3 shadow-lg">
+                            Acessar Sistema <i class="fas fa-arrow-right ms-2"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row mt-5 pt-5 g-4">
+                <div class="col-md-4">
+                    <div class="feature-card p-4 rounded-3 h-100">
+                        <div class="icon-box mb-3 text-primary">
+                            <i class="fas fa-file-signature fa-2x"></i>
+                        </div>
+                        <h5 class="fw-bold">Relatórios Padronizados</h5>
+                        <p class="small text-white-50">Crie relatórios consistentes baseados em modelos predefinidos por categoria.</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="feature-card p-4 rounded-3 h-100">
+                        <div class="icon-box mb-3 text-primary">
+                            <i class="fas fa-history fa-2x"></i>
+                        </div>
+                        <h5 class="fw-bold">Histórico Inteligente</h5>
+                        <p class="small text-white-50">Consulte o histórico de atividades por filial ou visão global com um clique.</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="feature-card p-4 rounded-3 h-100">
+                        <div class="icon-box mb-3 text-primary">
+                            <i class="fas fa-file-pdf fa-2x"></i>
+                        </div>
+                        <h5 class="fw-bold">Exportação PDF</h5>
+                        <p class="small text-white-50">Gere documentos PDF profissionais prontos para apresentação executiva.</p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
     </div>
-</body>
-</html>
+
+    <footer class="fixed-bottom text-center py-3 text-white-50 small">
+        <div class="container">
+            &copy; 2025 Sistema Gerenciador de Atividades. Todos os direitos reservados.
+        </div>
+    </footer>
+
+{% endblock %}

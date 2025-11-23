@@ -2,48 +2,67 @@
 
 {% block body_class %}login-body{% endblock %}
 
-{% block title %}Login{% endblock %}
+{% block title %}Acesso ao Sistema{% endblock %}
 
-{# Aqui está a mágica: estamos substituindo o bloco inteiro do conteúdo principal #}
 {% block main_content %}
-<div class="col-md-6 col-lg-5 col-xl-4">
-    <div class="login-card text-white">
-        <div class="text-center mb-4">
-            <h1 class="fw-bold">SGA</h1>
-            <p class="text-white-50">Sistema de Gestão de Auditoria</p>
-        </div>
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-5 col-xl-4">
+            
+            <div class="login-card text-white shadow-lg">
+                <div class="text-center mb-4">
+                    <div class="mb-3">
+                        <i class="fas fa-shield-alt fa-3x text-primary"></i>
+                    </div>
+                    <h2 class="fw-bold mb-1">SGA</h2>
+                    <p class="text-white-50 small text-uppercase letter-spacing-1">Acesso Restrito</p>
+                </div>
 
-        <form action="{{ url_for('login') }}" method="POST">
-            <div class="input-group mb-3">
-                <span class="input-group-text"><i class="fas fa-user"></i></span>
-                <input type="text" id="codigo" name="codigo" class="form-control form-control-lg" placeholder="Código do Colaborador" required>
-            </div>
+                <form action="{{ url_for('login') }}" method="POST">
+                    
+                    <div class="form-floating mb-3 text-dark">
+                        <input type="text" class="form-control" id="codigo" name="codigo" placeholder="Código" required>
+                        <label for="codigo"><i class="fas fa-id-card me-2"></i>Código do Colaborador</label>
+                    </div>
 
-            <div id="display-name-container" class="mb-3" style="min-height: 24px;">
-                <p id="display-name" class="form-text text-light fw-bold"></p>
-            </div>
+                    <div id="display-name-container" class="mb-3" style="min-height: 25px;">
+                        <p id="display-name" class="text-info fw-bold text-center small mb-0"></p>
+                    </div>
 
-            <div class="input-group mb-4">
-                <span class="input-group-text"><i class="fas fa-lock"></i></span>
-                <input type="password" id="senha" name="senha" class="form-control form-control-lg" placeholder="Senha" required>
+                    <div class="form-floating mb-4 text-dark">
+                        <input type="password" class="form-control" id="senha" name="senha" placeholder="Senha" required>
+                        <label for="senha"><i class="fas fa-lock me-2"></i>Senha</label>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            Entrar no Sistema
+                        </button>
+                        <a href="{{ url_for('home') }}" class="btn btn-outline-light btn-sm mt-2">
+                            <i class="fas fa-arrow-left me-1"></i> Voltar ao Início
+                        </a>
+                    </div>
+                </form>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        <div class="mt-4">
+                            {% for category, message in messages %}
+                                <div class="alert alert-{{ category }} alert-dismissible fade show p-2 small" role="alert">
+                                    {{ message }}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                {% endwith %}
             </div>
             
-            <div class="d-grid">
-                <button type="submit" class="btn btn-primary btn-lg">Entrar</button>
+            <div class="text-center mt-3 text-white-50 small">
+                &copy; 2025 Sistema Gerenciador de Atividades
             </div>
-        </form>
 
-        {# Movendo as mensagens de flash para dentro do nosso layout customizado #}
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category }} mt-3 alert-dismissible fade show" role="alert">
-                        {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    </div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
+        </div>
     </div>
 </div>
 
@@ -52,12 +71,18 @@
         const codigoInput = document.getElementById('codigo');
         const displayNameElement = document.getElementById('display-name');
         let typingTimer;
-        const doneTypingInterval = 500;
+        const doneTypingInterval = 500; // Tempo em ms (0.5 segundos)
+
         codigoInput.addEventListener('keyup', () => {
             clearTimeout(typingTimer);
-            displayNameElement.textContent = '...';
-            typingTimer = setTimeout(fetchUserName, doneTypingInterval);
+            if (codigoInput.value) {
+                displayNameElement.textContent = 'A procurar...';
+                typingTimer = setTimeout(fetchUserName, doneTypingInterval);
+            } else {
+                displayNameElement.textContent = '';
+            }
         });
+
         function fetchUserName() {
             const codigo = codigoInput.value;
             if (codigo.length > 0) {
@@ -67,11 +92,13 @@
                         return response.json();
                     })
                     .then(data => {
-                        displayNameElement.textContent = data.nome_completo ? data.nome_completo.toUpperCase() : '';
+                        displayNameElement.textContent = data.nome_completo ? `Olá, ${data.nome_completo}` : '';
+                        displayNameElement.className = "text-info fw-bold text-center small mb-0"; // Cor de sucesso
                     })
                     .catch(error => {
-                        console.error('Erro:', error);
-                        displayNameElement.textContent = '';
+                        // Não mostramos erro no console para o usuário, apenas limpamos ou avisamos sutilmente
+                        displayNameElement.textContent = 'Usuário não encontrado';
+                        displayNameElement.className = "text-warning fw-bold text-center small mb-0"; // Cor de aviso
                     });
             } else {
                 displayNameElement.textContent = '';
@@ -79,4 +106,4 @@
         }
     });
 </script>
-{% endblock main_content %}
+{% endblock %}

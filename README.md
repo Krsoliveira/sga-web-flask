@@ -1,13 +1,3 @@
-Com certeza! Um `README.md` bem escrito é o "cartão de visita" do projeto. Como mudámos a arquitetura para **SQL Server** e adicionámos a geração de **PDFs** (que requer dependências externas), é crucial documentar os pré-requisitos.
-
-Aqui está uma proposta completa e profissional para o seu ficheiro `README.md`. Pode copiar o código abaixo e substituir o conteúdo do seu ficheiro atual.
-
-Estou a utilizar a norma de **Português de Portugal** conforme a configuração do sistema, mas os termos técnicos mantêm-se universais.
-
----
-
-### Código para o arquivo `README.md`
-
 ```markdown
 # 📊 Sistema de Gestão de Auditorias e Relatórios (SGA)
 

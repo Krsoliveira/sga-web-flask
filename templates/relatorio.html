@@ -1,6 +1,5 @@
 {% extends "base.html" %}
-
-{% block title %}Relatório {{ caso.numero_relatorio_display }}{% endblock %}
+{% block title %}Detalhes do Relatório{% endblock %}
 
 {% from "_macros.html" import render_breadcrumb %}
 
@@ -10,281 +9,306 @@
         {'url': '#', 'text': 'Relatório ' ~ caso.numero_relatorio_display, 'active': True}
     ] %}
     {{ render_breadcrumb(breadcrumb_items) }}
-    <hr class="mt-0 mb-4">
 {% endblock %}
 
-
 {% block content %}
-    {# CABEÇALHO DO RELATÓRIO #}
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <div>
-            <h1 class="h3 mb-1">{{ caso.titulo }}</h1>
-            <span class="text-muted">Relatório Nº: {{ caso.numero_relatorio_display }}</span>
-        </div>
-        <div>
-            <span class="badge 
-                {% if caso.status == 'Aprovado' %} bg-success
-                {% elif caso.status == 'Pendente de Revisão' %} bg-warning
-                {% elif caso.status == 'Em Elaboração' %} bg-info
-                {% else %} bg-secondary
-                {% endif %} fs-6">
-                {{ caso.status }}
-            </span>
+<div class="row">
+    <div class="col-md-3 mb-4">
+        <div class="card shadow mb-4">
+            <div class="card-header bg-primary text-white">
+                <h6 class="m-0 fw-bold"><i class="fas fa-info-circle me-2"></i>Dados do Caso</h6>
+            </div>
+            <div class="card-body">
+                <p><strong>Nº:</strong> {{ caso.numero_relatorio_display }}</p>
+                <p><strong>Filial:</strong> {{ caso.filial.nome }}</p>
+                <p><strong>Cidade:</strong> {{ caso.filial.cidade }}</p>
+                <p><strong>Categoria:</strong> {{ caso.categoria.nome }}</p>
+                <p><strong>Status:</strong> 
+                    {% if caso.status == 'Aprovado' %}
+                        <span class="badge bg-success">Aprovado</span>
+                    {% elif caso.status == 'Pendente de Revisão' %}
+                        <span class="badge bg-warning text-dark">Em Revisão</span>
+                    {% elif caso.status == 'Concluído' %}
+                        <span class="badge bg-dark">Concluído</span>
+                    {% else %}
+                        <span class="badge bg-info">Em Elaboração</span>
+                    {% endif %}
+                </p>
+                
+                <hr>
+                
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('editar_relatorio', id_caso=caso.id) }}" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-edit me-2"></i>Editar Dados Gerais
+                    </a>
+                    <a href="{{ url_for('gerar_pdf_relatorio', id_caso=caso.id) }}" class="btn btn-outline-danger btn-sm">
+                        <i class="fas fa-file-pdf me-2"></i>Baixar PDF
+                    </a>
+
+                    {% if caso.status == 'Em Elaboração' %}
+                    <form action="{{ url_for('submeter_relatorio', id_caso=caso.id) }}" method="POST" class="d-grid mt-2">
+                        <button type="submit" class="btn btn-primary btn-sm">
+                            <i class="fas fa-paper-plane me-2"></i>Submeter p/ Revisão
+                        </button>
+                    </form>
+                    {% endif %}
+
+                    {% if caso.status == 'Pendente de Revisão' and usuario.role in ['Admin', 'Manager'] %}
+                        <hr>
+                        <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#modalAprovar">
+                            <i class="fas fa-check me-2"></i>Aprovar
+                        </button>
+                        <button type="button" class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#modalRejeitar">
+                            <i class="fas fa-times me-2"></i>Rejeitar
+                        </button>
+                    {% endif %}
+
+                    {% if caso.status != 'Concluído' %}
+                        {% if caso.status == 'Aprovado' %}
+                            <hr>
+                            <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalConcluir">
+                                <i class="fas fa-flag-checkered me-2"></i>Concluir & Arquivar
+                            </button>
+                        
+                        {% elif usuario.role in ['Admin', 'Manager'] %}
+                            <hr>
+                            <button type="button" class="btn btn-dark btn-sm" data-bs-toggle="modal" data-bs-target="#modalConcluir" title="Forçar conclusão sem aprovação">
+                                <i class="fas fa-lock me-2"></i>Forçar Conclusão
+                            </button>
+                        {% endif %}
+                    {% endif %}
+                </div>
+
+                {% if caso.status == 'Concluído' %}
+                <div class="alert alert-success mt-3 p-2 small">
+                    <h6 class="alert-heading fw-bold"><i class="fas fa-check-circle"></i> Auditoria Finalizada</h6>
+                    <hr class="my-1">
+                    <strong>Contexto da Apresentação:</strong><br>
+                    {{ caso.contexto_apresentacao }}
+                </div>
+                {% endif %}
+
+                {% if caso.notas_revisao %}
+                <div class="alert alert-warning mt-3 p-2 small">
+                    <strong>Notas de Revisão:</strong><br>
+                    {{ caso.notas_revisao }}
+                </div>
+                {% endif %}
+            </div>
         </div>
     </div>
 
-    {# MENU DE NAVEGAÇÃO DO RELATÓRIO (ABAS) #}
-    <ul class="nav nav-pills mb-4" id="pills-tab" role="tablist">
-        <li class="nav-item" role="presentation">
-            <button class="nav-link active" id="pills-geral-tab" data-bs-toggle="pill" data-bs-target="#pills-geral" type="button" role="tab" aria-controls="pills-geral" aria-selected="true">Visão Geral</button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" id="pills-atividades-tab" data-bs-toggle="pill" data-bs-target="#pills-atividades" type="button" role="tab" aria-controls="pills-atividades" aria-selected="false">Atividades</button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" id="pills-anexos-tab" data-bs-toggle="pill" data-bs-target="#pills-anexos" type="button" role="tab" aria-controls="pills-anexos" aria-selected="false">Anexos</button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link disabled" type="button">Histórico</button>
-        </li>
-    </ul>
-
-    {# CONTEÚDO DINÂMICO DAS ABAS (PAINÉIS) #}
-    <div class="tab-content" id="pills-tabContent">
-        
-        <div class="tab-pane fade show active" id="pills-geral" role="tabpanel" aria-labelledby="pills-geral-tab">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    Detalhes do Relatório
-                    <div class="btn-group" role="group">
-                        <a href="{{ url_for('editar_relatorio', id_caso=caso.id) }}" class="btn btn-secondary btn-sm">
-                            <i class="fas fa-pencil-alt"></i> Editar
-                        </a>
-                        <a href="{{ url_for('gerar_pdf_relatorio', id_caso=caso.id) }}" class="btn btn-success btn-sm">
-                            <i class="fas fa-file-pdf"></i> Gerar PDF
-                        </a>
-                    </div>
-                </div>
-                <div class="card-body">
-                    <p><strong>Tipo/Categoria:</strong> {{ caso.categoria.nome if caso.categoria else 'N/A' }}</p>
-                    <p><strong>Filial:</strong> {{ caso.filial.nome if caso.filial else 'N/A' }}</p>
-                    <p><strong>Data de Início:</strong> {{ caso.data_inicio }}</p>
-                    <p><strong>Status:</strong> {{ caso.status }}</p>
-                    {% if caso.notas_revisao %}
-                    <p class="mb-0"><strong>Notas da Última Revisão:</strong></p>
-                    <div class="alert alert-info">{{ caso.notas_revisao }}</div>
-                    {% endif %}
-                </div>
+<div class="col-md-9">
+        <div class="card shadow">
+            <div class="card-header bg-white">
+                <ul class="nav nav-tabs card-header-tabs" id="myTab" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="atividades-tab" data-bs-toggle="tab" data-bs-target="#atividades" type="button" role="tab">Atividades</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="anexos-tab" data-bs-toggle="tab" data-bs-target="#anexos" type="button" role="tab">Anexos</button>
+                    </li>
+                </ul>
             </div>
-        </div>
-
-        <div class="tab-pane fade" id="pills-atividades" role="tabpanel" aria-labelledby="pills-atividades-tab">
-            <div class="card">
-                <div class="card-header"><h5 class="mb-0">Registrar Nova Atividade</h5></div>
-                <div class="card-body">
-                    <form action="{{ url_for('adicionar_atividade', id_caso=caso.id) }}" method="POST">
-                        <div class="mb-3"><label for="atividade_desc" class="form-label">Descrição da Atividade</label><select class="form-select" id="atividade_desc" name="atividade_desc" required><option selected disabled value="">Selecione...</option>{% for opcao in opcoes_atividade %}<option value="{{ opcao }}">{{ opcao }}</option>{% endfor %}</select></div>
-                        
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label for="periodo_inicio" class="form-label">Período de Análise - Início</label>
-                                <input type="date" class="form-control" id="periodo_inicio" name="periodo_inicio">
-                            </div>
-                            <div class="col-md-6">
-                                <label for="periodo_fim" class="form-label">Período de Análise - Fim</label>
-                                <input type="date" class="form-control" id="periodo_fim" name="periodo_fim">
-                            </div>
-                        </div>
-
-                        <div class="mb-3"><label for="testes_realizados" class="form-label">Testes Realizados</label><textarea class="form-control" id="testes_realizados" name="testes_realizados" rows="3" required></textarea></div>
-                        
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label for="extensao_exames" class="form-label">Extensão dos Exames</label>
-                                <input type="text" class="form-control" id="extensao_exames" name="extensao_exames" placeholder="Ex: 15 amostras, 100% dos itens...">
-                            </div>
-                            <div class="col-md-6">
-                                <label for="criterio_amostragem" class="form-label">Critério de Amostragem</label>
-                                <input type="text" class="form-control" id="criterio_amostragem" name="criterio_amostragem" placeholder="Ex: Aleatório, Itens de alto valor...">
-                            </div>
-                        </div>
-
-                        <div class="mb-3"><label for="observacao_resumo" class="form-label">Observação / Resumo</label><textarea class="form-control" id="observacao_resumo" name="observacao_resumo" rows="3"></textarea></div>
-                        
-                        <div class="row"><div class="col-md-6 mb-3"><label for="nao_conformidade" class="form-label">Não Conformidade</label><input type="text" class="form-control" id="nao_conformidade" name="nao_conformidade"></div><div class="col-md-6 mb-3"><label for="situacao" class="form-label">Situação</label><select class="form-select" id="situacao" name="situacao" required>{% for opcao in opcoes_situacao %}<option value="{{ opcao }}">{{ opcao }}</option>{% endfor %}</select></div></div>
-                        <div class="mb-3"><label for="recomendacao" class="form-label">Recomendação</label><textarea class="form-control" id="recomendacao" name="recomendacao" rows="2"></textarea></div>
-                        <button type="submit" class="btn btn-primary">Salvar Atividade</button>
-                    </form>
-                </div>
-            </div>
-
-            <div class="card mt-4">
-                <div class="card-header">Atividades Registradas</div>
-                <div class="card-body">
-                    {% if atividades %}
-                    <div class="list-group">
-                        {% for atividade in atividades %}
-                            <button type="button" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center view-activity-btn" 
-                                    data-activity-id="{{ atividade.id }}"
-                                    data-edit-url="{{ url_for('editar_atividade', id_atividade=atividade.id) }}">
-                                <div>
-                                    <strong class="mb-1">{{ atividade.atividade_desc }}</strong>
-                                    <p class="mb-1 small text-muted">Realizado por: {{ atividade.realizado_por.nome_completo if atividade.realizado_por else 'Não atribuído' }}</p>
-                                </div>
-                                <span class="badge bg-primary rounded-pill">{{ atividade.situacao }}</span>
-                            </button>
-                        {% endfor %}
-                    </div>
-                    {% else %}
-                        <p class="text-center">Nenhuma atividade registrada.</p>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-        
-        <div class="tab-pane fade" id="pills-anexos" role="tabpanel" aria-labelledby="pills-anexos-tab">
-            <div class="card">
-                <div class="card-header"><h5 class="mb-0">Enviar Novo Anexo</h5></div>
-                <div class="card-body">
-                    <form action="{{ url_for('anexar_ficheiro', id_caso=caso.id) }}" method="POST" enctype="multipart/form-data">
-                        <div class="input-group">
-                            <input type="file" class="form-control" id="anexo" name="anexo" required>
-                            <button class="btn btn-primary" type="submit">
-                                <i class="fas fa-upload"></i> Enviar
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-
-            <div class="card mt-4">
-                <div class="card-header"><h5 class="mb-0">Anexos Enviados</h5></div>
-                <div class="card-body">
-                    {% if caso.anexos %}
-                        <ul class="list-group">
-                            {% for anexo in caso.anexos %}
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                <div>
-                                    <i class="fas fa-paperclip me-2"></i>
-                                    {{ anexo.nome_original }}
-                                    <small class="text-muted d-block">Enviado em: {{ anexo.data_upload }}</small>
-                                </div>
-                                <a href="{{ url_for('download_anexo', nome_seguro=anexo.nome_seguro) }}" class="btn btn-sm btn-outline-primary">
-                                    <i class="fas fa-download"></i> Download
-                                </a>
-                            </li>
-                            {% endfor %}
-                        </ul>
-                    {% else %}
-                        <p class="text-center">Nenhum anexo encontrado.</p>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-
-    </div> 
-    
-    <div class="modal fade" id="activityDetailModal" tabindex="-1" aria-labelledby="activityDetailModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="activityDetailModalLabel">Detalhes da Atividade</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <p><strong>Ponto de Auditoria:</strong> <span id="modal-atividade_desc"></span></p>
+            <div class="card-body">
+                <div class="tab-content" id="myTabContent">
                     
-                    <div class="row mb-2">
-                        <div class="col"><strong>Período Análise (Início):</strong> <span id="modal-periodo_inicio"></span></div>
-                        <div class="col"><strong>Período Análise (Fim):</strong> <span id="modal-periodo_fim"></span></div>
+                    <div class="tab-pane fade show active" id="atividades" role="tabpanel">
+                        
+                        {% if atividades %}
+                        <div class="list-group mb-4">
+                            {% for atividade in atividades %}
+                            <a href="{{ url_for('editar_atividade', id_atividade=atividade.id) }}" class="list-group-item list-group-item-action">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h6 class="mb-1 text-primary fw-bold">{{ atividade.atividade_desc }}</h6>
+                                    <small class="text-muted">{{ atividade.data_registro }}</small>
+                                </div>
+                                <div class="row mt-2">
+                                    <div class="col-md-8">
+                                        <p class="mb-1 small text-muted">{{ atividade.observacao_resumo or 'Sem observações.' }}</p>
+                                    </div>
+                                    <div class="col-md-4 text-end">
+                                        {% if atividade.situacao == 'SEM IRREGULARIDADES' %}
+                                            <span class="badge bg-success">Conforme</span>
+                                        {% elif atividade.situacao %}
+                                            <span class="badge bg-danger">{{ atividade.situacao }}</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Pendente</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </a>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                            <div class="alert alert-info">Nenhuma atividade registrada. Utilize o formulário abaixo.</div>
+                        {% endif %}
+
+                        <hr class="my-4">
+
+                        <h5 class="mb-3 text-gray-800"><i class="fas fa-plus-circle me-2"></i>Registrar Nova Atividade</h5>
+                        
+                        <form action="{{ url_for('adicionar_atividade', id_caso=caso.id) }}" method="POST">
+                            <div class="mb-3">
+                                <label for="atividade_desc" class="form-label">Descrição da Atividade</label>
+                                <select class="form-select" id="atividade_desc" name="atividade_desc" required>
+                                    <option selected disabled value="">Selecione...</option>
+                                    {% for opcao in opcoes_atividade %}
+                                        <option value="{{ opcao }}">{{ opcao }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="periodo_inicio" class="form-label">Período de Análise - Início</label>
+                                    <input type="date" class="form-control" id="periodo_inicio" name="periodo_inicio">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="periodo_fim" class="form-label">Período de Análise - Fim</label>
+                                    <input type="date" class="form-control" id="periodo_fim" name="periodo_fim">
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="extensao_exames" class="form-label">Extensão dos Exames</label>
+                                    <input type="text" class="form-control" id="extensao_exames" name="extensao_exames" placeholder="Ex: 15 amostras, 100% dos itens...">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="criterio_amostragem" class="form-label">Critério de Amostragem</label>
+                                    <input type="text" class="form-control" id="criterio_amostragem" name="criterio_amostragem" placeholder="Ex: Aleatório, Itens de alto valor...">
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="testes_realizados" class="form-label">Testes Realizados</label>
+                                <textarea class="form-control" id="testes_realizados" name="testes_realizados" rows="3" required></textarea>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="observacao_resumo" class="form-label">Observação / Resumo de Situações</label>
+                                <textarea class="form-control" id="observacao_resumo" name="observacao_resumo" rows="3" placeholder="Descreva aqui os detalhes, irregularidades encontradas ou observações gerais."></textarea>
+                            </div>
+
+                            <div class="mb-4">
+                                <label for="situacao" class="form-label fw-bold">Situação Final</label>
+                                <select class="form-select border-primary" id="situacao" name="situacao" required>
+                                    <option value="" selected disabled>Selecione a situação...</option>
+                                    {% for opcao in opcoes_situacao %}
+                                        <option value="{{ opcao }}">{{ opcao }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary">Salvar Atividade</button>
+                        </form>
                     </div>
 
-                    <div class="row mb-2">
-                        <div class="col"><strong>Extensão dos Exames:</strong> <br><span id="modal-extensao_exames"></span></div>
-                        <div class="col"><strong>Critério de Amostragem:</strong> <br><span id="modal-criterio_amostragem"></span></div>
-                    </div>
+   <div class="tab-pane fade" id="anexos" role="tabpanel">
+                        <h5 class="mb-3">Gerenciar Anexos</h5>
+                        
+                        <div class="list-group mb-3">
+                            {% for anexo in caso.anexos %}
+                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                <div>
+                                    <i class="fas fa-paperclip text-muted me-2"></i>
+                                    <a href="{{ url_for('download_anexo', nome_seguro=anexo.nome_seguro) }}" target="_blank" class="text-decoration-none">
+                                        {{ anexo.nome_arquivo }}
+                                    </a>
+                                </div>
+                                <span class="badge bg-light text-dark">{{ anexo.data_upload }}</span>
+                            </div>
+                            {% else %}
+                                <p class="text-muted">Nenhum anexo encontrado.</p>
+                            {% endfor %}
+                        </div>
 
-                    <p><strong>Testes Realizados:</strong></p>
-                    <pre id="modal-testes_realizados"></pre>
-                    <p><strong>Observação / Resumo:</strong></p>
-                    <pre id="modal-observacao_resumo"></pre>
-                    <hr>
-                    <p><strong>Não Conformidade:</strong> <span id="modal-nao_conformidade"></span></p>
-                    <p><strong>Recomendação:</strong> <span id="modal-recomendacao"></span></p>
-                    <hr>
-                    <div class="row">
-                        <div class="col"><strong>Situação:</strong> <span id="modal-situacao" class="badge"></span></div>
-                        <div class="col"><strong>Realizado por:</strong> <span id="modal-realizado_por_nome"></span></div>
+                        <div class="card bg-light mt-4">
+                            <div class="card-body">
+                                <h6 class="card-title">Novo Upload</h6>
+                                <form action="{{ url_for('anexar_ficheiro', id_caso=caso.id) }}" method="POST" enctype="multipart/form-data">
+                                    <div class="input-group">
+                                        <input type="file" class="form-control" name="anexo" required>
+                                        <button class="btn btn-outline-secondary" type="submit">Enviar</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    
+                </div> </div> </div> </div> </div> <div class="modal fade" id="modalAprovar" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">Aprovar Relatório</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="{{ url_for('aprovar_relatorio', id_caso=caso.id) }}" method="POST">
+                <div class="modal-body">
+                    <p>Confirma a aprovação deste relatório?</p>
+                    <div class="mb-3">
+                        <label class="form-label">Notas (Opcional)</label>
+                        <textarea class="form-control" name="notas_aprovacao"></textarea>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
-                    <button type="button" class="btn btn-primary" id="modal-edit-btn">Editar</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success">Confirmar Aprovação</button>
                 </div>
-            </div>
+            </form>
         </div>
     </div>
-{% endblock %}
+</div>
 
-{% block scripts %}
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    const activityModal = new bootstrap.Modal(document.getElementById('activityDetailModal'));
-    const viewButtons = document.querySelectorAll('.view-activity-btn');
-    const editButton = document.getElementById('modal-edit-btn');
-    
-    viewButtons.forEach(button => {
-        button.addEventListener('click', function () {
-            const activityId = this.dataset.activityId;
-            const editUrl = this.dataset.editUrl;
-            
-            editButton.onclick = () => { window.location.href = editUrl; };
-            
-            // Limpa o modal
-            document.getElementById('modal-atividade_desc').textContent = 'A carregar...';
-            document.getElementById('modal-periodo_inicio').textContent = '...';
-            document.getElementById('modal-periodo_fim').textContent = '...';
-            document.getElementById('modal-extensao_exames').textContent = '...';
-            document.getElementById('modal-criterio_amostragem').textContent = '...';
-            document.getElementById('modal-testes_realizados').textContent = '...';
-            document.getElementById('modal-observacao_resumo').textContent = '...';
-            document.getElementById('modal-nao_conformidade').textContent = '...';
-            document.getElementById('modal-recomendacao').textContent = '...';
-            document.getElementById('modal-realizado_por_nome').textContent = '...';
-            document.getElementById('modal-situacao').textContent = '...';
-            
-            fetch(`/api/atividade/${activityId}`)
-                .then(response => response.ok ? response.json() : Promise.reject('Erro ao buscar dados.'))
-                .then(data => {
-                    document.getElementById('modal-atividade_desc').textContent = data.atividade_desc || 'Não informado';
-                    document.getElementById('modal-periodo_inicio').textContent = data.periodo_inicio || 'Não informado';
-                    document.getElementById('modal-periodo_fim').textContent = data.periodo_fim || 'Não informado';
-                    
-                    // Preenchendo os novos campos
-                    document.getElementById('modal-extensao_exames').textContent = data.extensao_exames || 'Não informado';
-                    document.getElementById('modal-criterio_amostragem').textContent = data.criterio_amostragem || 'Não informado';
+<div class="modal fade" id="modalRejeitar" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">Rejeitar Relatório</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="{{ url_for('rejeitar_relatorio', id_caso=caso.id) }}" method="POST">
+                <div class="modal-body">
+                    <p>O relatório voltará para o status "Em Elaboração".</p>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Motivo da Rejeição (Obrigatório)</label>
+                        <textarea class="form-control" name="notas_revisao" required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger">Confirmar Rejeição</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
-                    document.getElementById('modal-testes_realizados').textContent = data.testes_realizados || 'Não informado';
-                    document.getElementById('modal-observacao_resumo').textContent = data.observacao_resumo || 'Não informado';
-                    document.getElementById('modal-nao_conformidade').textContent = data.nao_conformidade || 'Nenhuma';
-                    document.getElementById('modal-recomendacao').textContent = data.recomendacao || 'Nenhuma';
-                    document.getElementById('modal-realizado_por_nome').textContent = data.realizado_por_nome || 'Desconhecido';
-                    
-                    const situacaoBadge = document.getElementById('modal-situacao');
-                    situacaoBadge.textContent = data.situacao || 'Não informada';
-                    situacaoBadge.className = 'badge'; 
-                    if (data.situacao === 'FINALIZADO') situacaoBadge.classList.add('bg-success');
-                    else if (data.situacao === 'PENDENTE') situacaoBadge.classList.add('bg-warning');
-                    else situacaoBadge.classList.add('bg-info');
-                    
-                    activityModal.show();
-                })
-                .catch(error => {
-                    console.error('Erro:', error);
-                    alert('Erro ao carregar detalhes da atividade.');
-                });
-        });
-    });
-});
-</script>
-{% endblock %}
+<div class="modal fade" id="modalConcluir" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="fas fa-clipboard-check me-2"></i>Concluir Auditoria</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('concluir_relatorio', id_caso=caso.id) }}" method="POST">
+                <div class="modal-body">
+                    <p class="text-muted">
+                        Ao concluir, você confirma que o relatório foi apresentado e o ciclo foi finalizado.
+                    </p>
+                    <div class="mb-3">
+                        <label for="contexto_apresentacao" class="form-label fw-bold">Contexto da Apresentação / Feedback do Cliente</label>
+                        <textarea class="form-control" id="contexto_apresentacao" name="contexto_apresentacao" rows="4" required placeholder="Ex: Relatório apresentado ao gerente da loja. Foi acordado o prazo de 5 dias para regularização das pendências..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success">Confirmar Conclusão</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}                 

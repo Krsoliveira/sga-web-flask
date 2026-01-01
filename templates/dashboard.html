@@ -2,119 +2,191 @@
 
 {% block title %}Dashboard{% endblock %}
 
-{% block content %}
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h1 class="h3 mb-0 text-gray-800">Dashboard de Relatórios</h1>
-        
-        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalCriarRelatorio">
-            <i class="fas fa-plus-circle"></i> Criar Novo Relatório
-        </button>
+{% from "_macros.html" import render_breadcrumb %}
 
+{% block breadcrumb %}
+    {% set breadcrumb_items = [{'url': '#', 'text': 'Dashboard', 'active': True}] %}
+    {{ render_breadcrumb(breadcrumb_items) }}
+{% endblock %}
+
+{% block content %}
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1 class="h3 text-gray-800">Visão Geral</h1>
+            <p class="text-muted">Bem-vindo, <strong>{{ usuario.nome_completo }}</strong>. Aqui estão as auditorias recentes.</p>
+        </div>
+        <div class="col-md-4 text-end">
+            <button type="button" class="btn btn-primary shadow-sm" data-bs-toggle="modal" data-bs-target="#newReportModal">
+                <i class="fas fa-plus fa-sm text-white-50 me-2"></i>Novo Relatório
+            </button>
+        </div>
     </div>
 
-    <p class="text-muted">Bem-vindo(a) de volta, {{ usuario.nome_completo }}.</p>
-    
-    <hr class="mb-4">
-
-    <h2 class="h5 mb-3">Relatórios Cadastrados</h2>
-
-    <table class="table table-bordered table-hover">
-        <thead class="table-primary">
-            <tr>
-                <th scope="col">N° Relatório (Exibição)</th> <th scope="col">Título</th>
-                <th scope="col">Situação</th>
-                <th scope="col">Ações</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for caso in casos %}
-            <tr>
-                <td>{{ caso.numero_relatorio_display }}</td> 
-                <td>{{ caso.titulo }}</td>
-                <td>
-                    <span class="badge 
-                            {% if caso.status == 'Aprovado' %} bg-success
-                            {% elif caso.status == 'Pendente de Revisão' %} bg-warning
-                            {% elif caso.status == 'Em Elaboração' %} bg-info
-                            {% else %} bg-secondary
-                            {% endif %}">
-                            {{ caso.status }}
-                    </span>
-                </td>
-                <td>
-                    <a href="{{ url_for('ver_relatorio', id_caso=caso.id) }}" class="btn btn-sm btn-outline-primary">Abrir</a>
-                    <a href="{{ url_for('editar_relatorio', id_caso=caso.id) }}" class="btn btn-sm btn-outline-secondary">Editar</a>
-                </td>
-            </tr>
-            {% else %}
-            <tr>
-                <td colspan="4" class="text-center">Nenhum relatório encontrado.</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-
-    <div class="modal fade" id="modalCriarRelatorio" tabindex="-1" aria-labelledby="modalCriarRelatorioLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="modalCriarRelatorioLabel">Criar Novo Relatório de Auditoria</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+    <div class="row mb-4">
+        <div class="col-xl-4 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Relatórios Totais</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ casos|length }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-clipboard-list fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
                 </div>
-                <form action="" method="POST" id="formCriarRelatorio">
-                    <div class="modal-body">
-                        <p>Selecione a filial e o modelo de auditoria para começar.</p>
-                        
-                        <div class="mb-3">
-                            <label for="filialSelect" class="form-label">Filial</label>
-                            <select class="form-select" id="filialSelect" name="filial_id" required>
-                                <option value="" selected disabled>Selecione uma filial...</option>
-                                {% for filial in filiais %}
-                                    <option value="{{ filial.id }}">{{ filial.nome }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
+            </div>
+        </div>
 
-                        <div class="mb-3">
-                            <label for="categoriaSelect" class="form-label">Modelo de Auditoria</label>
-                            <select class="form-select" id="categoriaSelect" name="categoria_id" required>
-                                <option value="" selected disabled>Selecione uma categoria...</option>
-                                {% for categoria in categorias %}
-                                    <option value="{{ categoria.id }}">{{ categoria.nome }}</option>
-                                {% endfor %}
-                            </select>
+        <div class="col-xl-4 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Em Elaboração</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {% set count_elab = namespace(value=0) %}
+                                {% for c in casos if c.status == 'Em Elaboração' %}{% set count_elab.value = count_elab.value + 1 %}{% endfor %}
+                                {{ count_elab.value }}
+                            </div>
                         </div>
+                        <div class="col-auto">
+                            <i class="fas fa-pen fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
+        <div class="col-xl-4 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Aprovados</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {% set count_aprov = namespace(value=0) %}
+                                {% for c in casos if c.status == 'Aprovado' %}{% set count_aprov.value = count_aprov.value + 1 %}{% endfor %}
+                                {{ count_aprov.value }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-check-circle fa-2x text-gray-300"></i>
+                        </div>
                     </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                        <button type="submit" class="btn btn-primary">Criar Relatório</button>
-                    </div>
-                </form>
+                </div>
             </div>
         </div>
     </div>
 
-{% endblock %}
+<div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">Auditorias Recentes</h6>
+        </div>
+        <div class="card-body">
+            {% if casos %}
+            <div class="table-responsive">
+                <table class="table table-hover table-bordered" width="100%" cellspacing="0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Nº Relatório</th>
+                            <th>Filial</th>
+                            <th>Categoria</th>
+                            <th>Data Início</th>
+                            <th>Status</th>
+                            <th>Responsável</th>
+                            <th class="text-center" style="width: 120px;">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for caso in casos %}
+                        <tr>
+                            <td class="align-middle fw-bold">
+                                <a href="{{ url_for('ver_relatorio', id_caso=caso.id) }}" class="text-decoration-none">
+                                    {{ caso.numero_relatorio_display }}
+                                </a>
+                            </td>
+                            <td class="align-middle">{{ caso.filial.nome if caso.filial else 'N/A' }}</td>
+                            <td class="align-middle"><span class="badge bg-secondary">{{ caso.categoria.nome if caso.categoria else 'Geral' }}</span></td>
+                            <td class="align-middle">{{ caso.data_inicio }}</td>
+                            <td class="align-middle">
+                                {% if caso.status == 'Aprovado' %}
+                                    <span class="badge bg-success">Aprovado</span>
+                                {% elif caso.status == 'Pendente de Revisão' %}
+                                    <span class="badge bg-warning text-dark">Revisão</span>
+                                {% else %}
+                                    <span class="badge bg-info">Em Elaboração</span>
+                                {% endif %}
+                            </td>
+                            <td class="align-middle small text-muted">
+                                {{ caso.realizado_por.nome_completo if caso.realizado_por else 'N/A' }}
+                            </td>
+                            
+                            <td class="align-middle text-center">
+                                <div class="btn-group" role="group">
+                                    <a href="{{ url_for('ver_relatorio', id_caso=caso.id) }}" class="btn btn-sm btn-outline-primary" title="Abrir Relatório">
+                                        <i class="fas fa-folder-open"></i>
+                                    </a>
+                                    
+                                    {% if usuario and usuario.role in ['Admin', 'Manager'] %}
+                                    <form action="{{ url_for('deletar_relatorio', id_caso=caso.id) }}" method="POST" class="d-inline" onsubmit="return confirm('ATENÇÃO: Ação Irreversível!\n\nTem certeza que deseja EXCLUIR este relatório?\nIsso apagará todas as atividades e arquivos anexados permanentemente.');">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger ms-1" title="Excluir Relatório">
+                                            <i class="fas fa-trash-alt"></i>
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+                <div class="text-center py-5">
+                    <img src="https://img.icons8.com/clouds/100/000000/documents.png" alt="Sem dados" class="mb-3">
+                    <p class="lead text-gray-500 mb-0">Nenhum relatório encontrado.</p>
+                    <p class="small text-muted">Clique em "Novo Relatório" para começar.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
 
-{% block scripts %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const form = document.getElementById('formCriarRelatorio');
-    const categoriaSelect = document.getElementById('categoriaSelect');
-
-    function updateFormAction() {
-        const categoriaId = categoriaSelect.value;
-        if (categoriaId) {
-            const actionUrl = "{{ url_for('novo_relatorio_por_categoria', categoria_id=0) }}".replace('0', categoriaId);
-            form.action = actionUrl;
-        } else {
-            form.action = ""; 
-        }
-    }
-
-    categoriaSelect.addEventListener('change', updateFormAction);
-    updateFormAction(); // Define a ação inicial
-});
-</script>
-{% endblock %}
+    <div class="modal fade" id="newReportModal" tabindex="-1" aria-labelledby="newReportModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="newReportModalLabel">Iniciar Nova Auditoria</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Selecione o tipo de auditoria e a filial para gerar a estrutura base.</p>
+                    <div class="d-grid gap-2">
+                        {% for categoria in categorias %}
+                        <form action="{{ url_for('novo_relatorio_por_categoria', categoria_id=categoria.id) }}" method="POST" class="d-grid">
+                            <div class="mb-2 text-start">
+                                <label for="filial_select_{{ categoria.id }}" class="form-label small fw-bold text-muted">Filial para: {{ categoria.nome }}</label>
+                                <select class="form-select form-select-sm mb-2" name="filial_id" id="filial_select_{{ categoria.id }}" required>
+                                    <option value="" selected disabled>Escolha a Filial...</option>
+                                    {% for filial in filiais %}
+                                        <option value="{{ filial.id }}">{{ filial.nome }} - {{ filial.cidade }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-outline-primary text-start">
+                                <i class="fas fa-file-alt me-2"></i> {{ categoria.nome }}
+                            </button>
+                        </form>
+                        {% else %}
+                            <div class="alert alert-warning">Nenhuma categoria cadastrada.</div>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}    

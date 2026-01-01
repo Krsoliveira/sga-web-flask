@@ -1,47 +1,69 @@
 {% extends "base.html" %}
 
-{% block title %}Editar Relatório{% endblock %}
+{% block title %}Editar Dados do Relatório{% endblock %}
 
 {% from "_macros.html" import render_breadcrumb %}
 
 {% block breadcrumb %}
     {% set breadcrumb_items = [
         {'url': url_for('dashboard'), 'text': 'Dashboard'},
-        {'url': url_for('ver_relatorio', id_caso=caso.id), 'text': 'Relatório ' ~ caso.numero_relatorio},
-        {'url': '#', 'text': 'Editar Detalhes', 'active': True}
+        {'url': url_for('ver_relatorio', id_caso=caso.id), 'text': 'Relatório ' ~ caso.numero_relatorio_display},
+        {'url': '#', 'text': 'Editar Cabeçalho', 'active': True}
     ] %}
     {{ render_breadcrumb(breadcrumb_items) }}
-    <hr class="mt-0 mb-4">
 {% endblock %}
 
 {% block content %}
-    <h1 class="h3 mb-4">Editar Detalhes do Relatório</h1>
-
-    <form method="POST">
-        <div class="mb-3">
-            <label for="titulo" class="form-label">Título do Relatório</label>
-            <input type="text" class="form-control" id="titulo" name="titulo" value="{{ caso.titulo }}" required>
-        </div>
-
-        <div class="row">
-            <div class="col-md-6 mb-3">
-                <label for="tipo" class="form-label">Tipo</label>
-                <input type="text" class="form-control" id="tipo" name="tipo" value="{{ caso.tipo }}" required>
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="fas fa-edit me-2"></i>Editar Dados Gerais</h5>
             </div>
-            <div class="col-md-6 mb-3">
-                <label for="status" class="form-label">Status do Relatório</label>
-                <select class="form-select" id="status" name="status" required>
-                    {% for opcao in opcoes_situacao %}
-                    <option value="{{ opcao }}" {% if opcao == caso.status %}selected{% endif %}>{{ opcao }}</option>
-                    {% endfor %}
-                </select>
+            <div class="card-body">
+                <form method="POST">
+                    
+                    <div class="alert alert-light border mb-4">
+                        <div class="row">
+                            <div class="col-md-6 mb-2">
+                                <small class="text-muted fw-bold">Filial Auditada</small><br>
+                                {{ caso.filial.nome }} - {{ caso.filial.cidade }}
+                            </div>
+                            <div class="col-md-6 mb-2">
+                                <small class="text-muted fw-bold">Categoria</small><br>
+                                {{ caso.categoria.nome }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="data_inicio" class="form-label">Data Início</label>
+                            <input type="date" class="form-control" id="data_inicio" name="data_inicio" value="{{ caso.data_inicio }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="data_final" class="form-label">Data Final</label>
+                            <input type="date" class="form-control" id="data_final" name="data_final" value="{{ caso.data_final or '' }}">
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="status" class="form-label">Status Atual</label>
+                        <select class="form-select" id="status" name="status">
+                            <option value="Em Elaboração" {% if caso.status == 'Em Elaboração' %}selected{% endif %}>Em Elaboração</option>
+                            <option value="Pendente de Revisão" {% if caso.status == 'Pendente de Revisão' %}selected{% endif %}>Pendente de Revisão</option>
+                            <option value="Aprovado" {% if caso.status == 'Aprovado' %}selected{% endif %}>Aprovado</option>
+                        </select>
+                        <div class="form-text">Alterar o status manualmente pode afetar o fluxo de aprovação.</div>
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{{ url_for('ver_relatorio', id_caso=caso.id) }}" class="btn btn-secondary me-md-2">Cancelar</a>
+                        <button type="submit" class="btn btn-success">Salvar Alterações</button>
+                    </div>
+                </form>
             </div>
         </div>
-        
-        <div class="d-flex justify-content-end">
-            <a href="{{ url_for('ver_relatorio', id_caso=caso.id) }}" class="btn btn-secondary me-2">Cancelar</a>
-            <button type="submit" class="btn btn-primary">Salvar Alterações</button>
-        </div>
-    </form>
+    </div>
+</div>
 {% endblock %}
-

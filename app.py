@@ -329,6 +329,48 @@ def rejeitar_relatorio(id_caso):
         flash('Ocorreu um erro ao rejeitar o relatório.', 'danger')
     return redirect(url_for('ver_relatorio', id_caso=id_caso))
 
+@app.route('/relatorio/<int:id_caso>/concluir', methods=['POST'])
+@login_required
+def concluir_relatorio(id_caso):
+    texto_apresentacao = request.form.get('contexto_apresentacao')
+    
+    if not texto_apresentacao:
+        flash('É obrigatório descrever o contexto da apresentação para concluir.', 'warning')
+        return redirect(url_for('ver_relatorio', id_caso=id_caso))
+
+    with db.get_db() as sess:
+        caso = db.buscar_caso_por_id(sess, id_caso)
+        
+        if not caso:
+            flash('Relatório não encontrado.', 'danger')
+            return redirect(url_for('dashboard'))
+
+        # === REGRA DE NEGÓCIO ===
+        permite_concluir = False
+        
+        # Regra 1: Se já está APROVADO, qualquer usuário logado pode concluir
+        if caso.status == 'Aprovado':
+            permite_concluir = True
+            
+        # Regra 2: Se NÃO está aprovado, apenas Admin ou Manager pode forçar a conclusão
+        elif g.user.role in ['Admin', 'Manager']:
+            permite_concluir = True
+        
+        else:
+            permite_concluir = False
+
+        if permite_concluir:
+            # Atualiza o status e salva o texto
+            caso.status = 'Concluído'
+            caso.contexto_apresentacao = texto_apresentacao
+            # Opcional: Salvar data de conclusão se tivermos coluna para isso
+            sess.commit()
+            flash('Relatório marcado como CONCLUÍDO com sucesso!', 'success')
+        else:
+            flash('Você não tem permissão para concluir este relatório no status atual.', 'danger')
+
+    return redirect(url_for('ver_relatorio', id_caso=id_caso))
+
 
 @app.route('/uploads/<string:nome_seguro>')
 @login_required
@@ -363,14 +405,19 @@ def editar_relatorio(id_caso):
 
     # Se o formulário foi submetido (método POST)
     if request.method == 'POST':
+        # CORREÇÃO: Removemos 'titulo' e 'tipo' que não existem mais no banco
+        # Adicionamos 'data_inicio' e 'data_final' que são úteis
         dados_formulario = {
-            'titulo': request.form.get('titulo'),
-            'tipo': request.form.get('tipo'),
-            'status': request.form.get('status')
+            'status': request.form.get('status'),
+            'data_inicio': request.form.get('data_inicio'),
+            'data_final': request.form.get('data_final')
         }
+        
+        # Removemos chaves com valores vazios para não apagar dados existentes sem querer
+        dados_limpos = {k: v for k, v in dados_formulario.items() if v is not None}
+
         with db.get_db() as sess:
-            # Chama a nova função para atualizar o banco
-            sucesso = db.atualizar_relatorio(sess, id_caso, dados_formulario)
+            sucesso = db.atualizar_relatorio(sess, id_caso, dados_limpos)
         
         if sucesso:
             flash('Relatório atualizado com sucesso!', 'success')
@@ -379,7 +426,6 @@ def editar_relatorio(id_caso):
             flash('Ocorreu um erro ao atualizar o relatório.', 'danger')
 
     # Se for a primeira vez a aceder à página (método GET), mostra o formulário
-    # (O template 'editar_relatorio.html' já deve existir na sua pasta de templates)
     return render_template('editar_relatorio.html', 
                            caso=caso, 
                            opcoes_situacao=config.LISTA_SITUACAO)
@@ -732,7 +778,21 @@ def get_historico_atividade_global(id_atividade_atual):
 
     except Exception as e:
         print(f"ERRO na API de histórico global: {e}")
-        return jsonify({'error': 'Ocorreu um erro interno ao buscar o histórico global.'}), 500       
+        return jsonify({'error': 'Ocorreu um erro interno ao buscar o histórico global.'}), 500
+
+@app.route('/relatorio/<int:id_caso>/deletar', methods=['POST'])
+@login_required
+@role_required('Admin', 'Manager') # Apenas chefia pode deletar
+def deletar_relatorio(id_caso):
+    with db.get_db() as sess:
+        sucesso = db.deletar_caso(sess, id_caso)
+    
+    if sucesso:
+        flash('Relatório e todos os seus dados excluídos com sucesso.', 'success')
+    else:
+        flash('Erro ao excluir o relatório.', 'danger')
+        
+    return redirect(url_for('dashboard'))       
 
 if __name__ == '__main__':
     app.run(debug=True)

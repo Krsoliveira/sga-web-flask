@@ -1,166 +1,168 @@
-```markdown
-# 📊 Sistema de Gestão de Auditorias e Relatórios (SGA)
+# SGA — Sistema de Gestão de Auditorias
 
-Uma plataforma web robusta para a gestão completa de auditorias operacionais, desde o planeamento e recolha de evidências até à geração de relatórios PDF profissionais e análise de conformidade.
-
----
-
-## 🚀 Funcionalidades Principais
-
-* **Gestão de Auditorias:** Criação de relatórios baseados em Filiais e Categorias personalizáveis.
-* **Checklists Inteligentes:** Atividades padrão (POPs) carregadas automaticamente por categoria.
-* **Fluxo de Aprovação:** Ciclo de vida completo: *Em Elaboração* → *Revisão* → *Aprovação* → *Conclusão*.
-* **Evidências:** Upload de fotos e documentos por atividade.
-* **Relatórios PDF:** Geração automática de relatórios profissionais com simbologia de conformidade ($\checkmark$, $X$).
-* **Hierarquia de Utilizadores:** Controlo de acesso baseado em funções (Admin, Manager, Auditor).
-* **Segurança:** Eliminação lógica e física de ficheiros e proteção de rotas sensíveis.
+Plataforma web para gestão completa de auditorias operacionais: criação de relatórios estruturados por POPs (Procedimentos Operacionais Padrão), fluxo de aprovação por hierarquia, upload de evidências e geração de relatórios em PDF.
 
 ---
 
-## 🛠️ Tecnologias Utilizadas
+## Funcionalidades
 
-* **Backend:** Python 3.10+, Flask
-* **Base de Dados:** SQL Server (via SQLAlchemy e PyODBC)
-* **Frontend:** Bootstrap 5, Jinja2, HTML5/CSS3
-* **PDF Engine:** WeasyPrint
-* **Autenticação:** Sessões geridas do lado do servidor com hash de palavras-passe.
-
----
-
-## 📋 Pré-requisitos
-
-Antes de iniciar, certifique-se de que tem instalado no seu ambiente:
-
-1.  **Python 3.8 ou superior**: [Download Python](https://www.python.org/downloads/)
-2.  **Microsoft SQL Server** (Express ou Standard): Base de dados relacional.
-3.  **ODBC Driver 17 for SQL Server**: Necessário para o Python comunicar com o SQL Server. [Download Microsoft](https://learn.microsoft.com/en-us/sql/connect/odbc/download-odbc-driver-for-sql-server)
-4.  **GTK3 Runtime (Apenas para Windows)**: Essencial para a biblioteca `WeasyPrint` gerar PDFs.
-    * *Sem isto, a geração de PDF falhará com erro de `dlopen` ou `dll missing`.*
-    * [Download GTK3 Installer](https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer/releases)
+- **Relatórios baseados em POPs** — ao iniciar uma auditoria, as atividades padrão da categoria são carregadas automaticamente
+- **Fluxo de aprovação** — `Em Elaboração → Pendente de Revisão → Aprovado → Concluído`
+- **Editor de POPs** — crie e publique procedimentos com blocos de texto, alertas e títulos de seção
+- **Geração de PDF** — relatório profissional gerado em memória via ReportLab
+- **Upload de evidências** — anexe fotos e documentos a cada relatório
+- **Controle de acesso por papel** — Admin, Manager e Auditor com permissões distintas
+- **Filtro e busca** no dashboard por status, filial e categoria
+- **Hash seguro de senhas** via werkzeug (scrypt)
 
 ---
 
-## ⚙️ Instalação e Configuração
+## Tecnologias
 
-Siga os passos abaixo para colocar o projeto a rodar localmente:
+| Camada | Tecnologia |
+|---|---|
+| Backend | Python 3.10+, Flask 3.x |
+| Banco de dados | SQL Server + SQLAlchemy 2.x + PyODBC |
+| Frontend | Bootstrap 5, Jinja2, Font Awesome 6 |
+| PDF | ReportLab |
+| Segurança | werkzeug.security (scrypt) |
 
-### 1. Clonar o Repositório
+---
+
+## Pré-requisitos
+
+1. **Python 3.10+** — [python.org](https://www.python.org/downloads/)
+2. **Microsoft SQL Server** (Express é suficiente)
+3. **ODBC Driver 17 for SQL Server** — [download Microsoft](https://learn.microsoft.com/pt-br/sql/connect/odbc/download-odbc-driver-for-sql-server)
+
+---
+
+## Instalação
+
+### 1. Clonar o repositório
+
 ```bash
-git clone [https://github.com/seu-usuario/seu-repositorio.git](https://github.com/seu-usuario/seu-repositorio.git)
-cd seu-repositorio
-
+git clone https://github.com/Krsoliveira/sga-web-flask.git
+cd sga-web-flask
 ```
 
-### 2. Criar o Ambiente Virtual
-
-Recomendamos o uso de um ambiente virtual para isolar as dependências.
+### 2. Criar e ativar o ambiente virtual
 
 ```bash
 # Windows
 python -m venv venv_web
-.\venv_web\Scripts\activate
+.\venv_web\Scripts\Activate.ps1
 
-# Linux/Mac
+# Linux / Mac
 python3 -m venv venv_web
 source venv_web/bin/activate
-
 ```
 
-### 3. Instalar Dependências
+### 3. Instalar dependências
 
 ```bash
 pip install -r requirements.txt
-
 ```
 
-### 4. Configurar Variáveis de Ambiente
+### 4. Configurar variáveis de ambiente
 
-Crie um ficheiro chamado `.env` na raiz do projeto e configure a string de conexão com o seu SQL Server:
+Crie o arquivo `.env` na raiz do projeto:
 
 ```ini
-# Exemplo de conteúdo do arquivo .env
-DATABASE_URL="mssql+pyodbc://usuario:senha@SERVIDOR\INSTANCIA/NOME_DO_BANCO?driver=ODBC+Driver+17+for+SQL+Server"
-SECRET_KEY="sua_chave_secreta_super_segura"
+SECRET_KEY="sua_chave_secreta_aqui"
 
+# Autenticação Windows (recomendado para ambiente local)
+DATABASE_URL="mssql+pyodbc://@localhost/SGA_DB?driver=ODBC+Driver+17+for+SQL+Server&trusted_connection=yes"
+
+# Autenticação por usuário e senha
+# DATABASE_URL="mssql+pyodbc://usuario:senha@servidor/SGA_DB?driver=ODBC+Driver+17+for+SQL+Server"
 ```
 
-*Nota: Substitua `usuario`, `senha`, `SERVIDOR\INSTANCIA` e `NOME_DO_BANCO` pelos seus dados reais.*
+### 5. Criar o banco de dados e o usuário admin
 
-### 5. Inicializar a Base de Dados
-
-O sistema possui um script para criar automaticamente todas as tabelas e o utilizador administrador.
+Crie o banco `SGA_DB` no SQL Server e execute:
 
 ```bash
 python database.py
-
 ```
 
-*Se tudo correr bem, verá a mensagem: "Banco de dados inicializado. Usuário ADMIN criado."*
+Isso cria todas as tabelas e o usuário `ADMIN` com a senha `admin123`.
 
-### 6. Executar a Aplicação
+> **Atenção:** se o banco já existia antes da versão atual, a coluna `senha_hash` precisa ser ampliada para `NVARCHAR(256)`. Execute uma única vez:
+> ```bash
+> python -c "
+> from sqlalchemy import text
+> from database import engine
+> with engine.connect() as conn:
+>     conn.execute(text('ALTER TABLE dbo.usuarios ALTER COLUMN senha_hash NVARCHAR(256) NOT NULL'))
+>     conn.commit()
+>     print('Migração concluída.')
+> "
+> ```
+
+### 6. Rodar a aplicação
 
 ```bash
 python app.py
-
 ```
 
-Aceda no seu navegador: `http://127.0.0.1:5000`
+Acesse: **http://127.0.0.1:5000**
 
 ---
 
-## 🔐 Acesso Inicial
+## Acesso inicial
 
-Após a inicialização da base de dados, um utilizador administrador padrão é criado:
+| Campo | Valor |
+|---|---|
+| Código | `ADMIN` |
+| Senha | `admin123` |
 
-* **Código:** `ADMIN`
-* **Palavra-passe:** `admin123`
-
-> **Importante:** Altere esta palavra-passe imediatamente após o primeiro login.
+> Altere a senha após o primeiro login em **Minha Conta → Editar Perfil**.
 
 ---
 
-## 📚 Estrutura do Projeto
+## Estrutura do projeto
 
-```text
-/
-├── app.py                 # Lógica principal (Rotas e Controladores)
-├── database.py            # Modelos e Configuração da Base de Dados
-├── requirements.txt       # Lista de dependências
-├── .env                   # Variáveis de ambiente (Ignorado pelo Git)
-├── templates/             # Ficheiros HTML (Jinja2)
-├── static/                # CSS, JS e Imagens
-└── uploads/               # Pasta onde os anexos são guardados
-
+```
+sga-web-flask/
+├── app.py              # Rotas e controladores Flask
+├── database.py         # Modelos SQLAlchemy e lógica de negócio
+├── pdf_generator.py    # Geração de relatórios PDF com ReportLab
+├── requirements.txt    # Dependências Python
+├── .env                # Variáveis de ambiente (não versionado)
+├── templates/          # Templates Jinja2
+│   ├── base.html
+│   ├── dashboard.html
+│   ├── relatorio.html
+│   ├── admin_*.html    # Painéis de administração
+│   └── ...
+└── uploads/            # Arquivos anexados pelos usuários (não versionado)
 ```
 
 ---
 
-## 🐛 Como Contribuir / Reportar Erros
+## Papéis de usuário
 
-1. Faça um Fork do projeto.
-2. Crie uma Branch para a sua Feature (`git checkout -b feature/NovaFeature`).
-3. Faça o Commit (`git commit -m 'Adicionado nova feature'`).
-4. Faça o Push (`git push origin feature/NovaFeature`).
-5. Abra um Pull Request.
+| Papel | Permissões |
+|---|---|
+| **Admin** | Acesso total — gerencia usuários, categorias, filiais, POPs e pode forçar conclusão de relatórios |
+| **Manager** | Aprova/rejeita relatórios, gerencia POPs e equipe |
+| **Auditor** | Cria e preenche relatórios, submete para revisão |
 
 ---
 
-**Desenvolvido com 💙 e Python.**
+## Fluxo de uma auditoria
 
 ```
-
-### O que adicionei de especial neste README:
-
-1.  **Aviso do GTK3:** Esta é a parte mais crítica. Como você usa o **WeasyPrint** no Windows, qualquer pessoa que baixar o projeto vai ter erros ao gerar PDF se não instalar o GTK3. Deixei o link direto para download.
-2.  **ODBC Driver:** Especifiquei que é necessário ter o driver do SQL Server instalado, não basta ter o Python.
-3.  **Setup da Base de Dados:** Expliquei claramente que devem rodar o `python database.py` antes do `app.py`.
-4.  **Login Padrão:** Documentei o utilizador `ADMIN` que criámos no código anterior, senão ninguém consegue entrar na primeira vez.
-
-Assim que atualizar o ficheiro, pode fazer o commit:
-
-```bash
-git add README.md
-git commit -m "Docs: Atualizacao completa do manual de instalacao e requisitos"
-git push
-
+1. Admin/Manager cadastra Categoria + POPs publicados
+2. Auditor seleciona Categoria + Filial → relatório criado com atividades pré-carregadas
+3. Auditor preenche cada atividade e submete para revisão
+4. Manager aprova ou devolve com notas
+5. Relatório aprovado → PDF gerado → Auditoria concluída e arquivada
 ```
+
+---
+
+## Licença
+
+Distribuído sob a licença MIT.

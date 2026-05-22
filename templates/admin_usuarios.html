@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}Gestão de Usuários{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 text-gray-800">Usuários do Sistema</h1>
+    <a href="{{ url_for('criar_usuario') }}" class="btn btn-primary shadow-sm">
+        <i class="fas fa-user-plus me-2"></i>Novo Usuário
+    </a>
+</div>
+
+<div class="card shadow mb-4">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover" width="100%" cellspacing="0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Código</th>
+                        <th>Nome Completo</th>
+                        <th>Username</th>
+                        <th>Perfil</th>
+                        <th>Gerente</th>
+                        <th class="text-center">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in usuarios %}
+                    <tr>
+                        <td>{{ u.codigo }}</td>
+                        <td>{{ u.nome_completo }}</td>
+                        <td>{{ u.username }}</td>
+                        <td>
+                            {% if u.role == 'Admin' %}
+                                <span class="badge bg-danger">Admin</span>
+                            {% elif u.role == 'Manager' %}
+                                <span class="badge bg-warning text-dark">Manager</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Auditor</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ u.gerente.nome_completo if u.gerente else '-' }}</td>
+                        <td class="text-center">
+                            <a href="{{ url_for('editar_usuario', user_id=u.id) }}" class="btn btn-sm btn-info text-white">
+                                <i class="fas fa-edit"></i> Editar
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

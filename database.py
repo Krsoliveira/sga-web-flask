@@ -1,15 +1,14 @@
 import os
-import hashlib
 import datetime
 from dotenv import load_dotenv
+from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, Text, Float, Boolean
-# Importação completa e corrigida
 from sqlalchemy.orm import sessionmaker, declarative_base, relationship, joinedload, scoped_session 
 from sqlalchemy.inspection import inspect
 from contextlib import contextmanager
 import sqlalchemy 
 
-# Carrega as variáveis de ambiente do arquivo .env
+# --- Carregamento de Ambiente ---
 load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -20,18 +19,16 @@ if not DATABASE_URL:
 # --- Configuração do SQLAlchemy ---
 engine = create_engine(DATABASE_URL)
 session_factory = sessionmaker(autocommit=False, autoflush=False, bind=engine, expire_on_commit=False)
-
-# Criação correta da Scoped Session
 ScopedSession = scoped_session(session_factory)
 
 Base = declarative_base()
 
-# --- Gerenciador de Contexto para Banco de Dados ---
+# --- Gerenciador de Contexto (Context Manager) ---
 @contextmanager
 def get_db():
     """
-    Fornece uma sessão transacional.
-    Usa 'ScopedSession' para garantir thread-safety.
+    Fornece uma sessão transacional segura.
+    Usa 'yield' para entregar a sessão e 'finally' para fechar.
     """
     session = ScopedSession()
     try:
@@ -42,30 +39,29 @@ def get_db():
         raise e
     finally:
         session.close()
-        # Remove a sessão do registro para evitar vazamento de memória ou dados antigos
         ScopedSession.remove()
 
 def init_db():
+    """Cria as tabelas no banco de dados se não existirem."""
     Base.metadata.create_all(bind=engine)
-    print("Banco de dados inicializado.")
+    print("Banco de dados inicializado com sucesso.")
     
-# Função auxiliar para converter objetos SQLAlchemy em Dicionários
 def object_as_dict(obj):
-    return {c.key: getattr(obj, c.key)
-            for c in inspect(obj).mapper.column_attrs}
+    """Converte um objeto SQLAlchemy num dicionário Python."""
+    return {c.key: getattr(obj, c.key) for c in inspect(obj).mapper.column_attrs}
 
-# --- Modelos (Tabelas) ---
+# --- MODELOS (TABELAS) ---
 
 class Usuario(Base):
     __tablename__ = 'usuarios'
     id = Column(Integer, primary_key=True)
     codigo = Column(String(50), unique=True, nullable=False)
     nome_completo = Column(String(100), nullable=False)
-    username = Column(String(50), unique=True, nullable=False) # Gerado automaticamente
-    senha_hash = Column(String(128), nullable=False)
-    role = Column(String(20), default='Auditor') # 'Admin', 'Manager', 'Auditor'
+    username = Column(String(50), unique=True, nullable=False)
+    senha_hash = Column(String(256), nullable=False)
+    role = Column(String(20), default='Auditor') # Admin, Manager, Auditor
     
-    # Auto-relacionamento para Hierarquia (Gerente -> Auditores)
+    # Auto-relacionamento (Gerente -> Equipe)
     gerente_id = Column(Integer, ForeignKey('usuarios.id'), nullable=True)
     equipe = relationship("Usuario", backref=sqlalchemy.orm.backref('gerente', remote_side=[id]))
 
@@ -75,7 +71,7 @@ class Filial(Base):
     nome = Column(String(100), unique=True, nullable=False)
     cidade = Column(String(100), nullable=False)
     
-    # Relacionamento com Casos
+    # Relacionamento: Uma filial tem muitos casos
     casos = relationship("Caso", back_populates="filial")
 
 class Categoria(Base):
@@ -83,32 +79,59 @@ class Categoria(Base):
     id = Column(Integer, primary_key=True)
     nome = Column(String(100), unique=True, nullable=False)
     
-    # Relacionamento com Modelos de Atividade
+    # Relacionamento com Atividades Padrão (Manuais/POPs)
     atividades_padrao = relationship("AtividadePadrao", back_populates="categoria", cascade="all, delete-orphan")
+    
     # Relacionamento com Casos gerados
     casos = relationship("Caso", back_populates="categoria")
 
+# === ESTRUTURA DE POP (BLOCOS) ===
+
 class AtividadePadrao(Base):
+    """
+    Representa o cabeçalho de um manual (POP).
+    Ex: 'Verificação de Extintores'
+    """
     __tablename__ = 'atividades_padrao'
     id = Column(Integer, primary_key=True)
-    descricao = Column(Text, nullable=False)
+    titulo = Column(String(200), nullable=False) 
     
-    # NOVO CAMPO: POP (Procedimento Operacional Padrão)
-    instrucoes = Column(Text, nullable=True) 
+    # Status: 'Rascunho', 'Em Aprovação', 'Publicado'
+    status = Column(String(50), default='Rascunho')
+    
+    # Autor do manual
+    autor_id = Column(Integer, ForeignKey('usuarios.id'), nullable=True)
+    autor = relationship("Usuario", foreign_keys=[autor_id])
     
     categoria_id = Column(Integer, ForeignKey('categorias.id'), nullable=False)
     categoria = relationship("Categoria", back_populates="atividades_padrao")
+    
+    # Os passos (blocos) do manual
+    passos = relationship("PassoPOP", back_populates="atividade_padrao", cascade="all, delete-orphan", order_by="PassoPOP.ordem")
+
+class PassoPOP(Base):
+    """
+    Representa um BLOCO individual de informação (Texto, Imagem, Alerta).
+    """
+    __tablename__ = 'passos_pop'
+    id = Column(Integer, primary_key=True)
+    tipo = Column(String(20), default='texto') # 'texto', 'imagem', 'alerta', 'titulo_secao'
+    conteudo = Column(Text, nullable=True)     # O texto HTML ou o caminho da imagem
+    ordem = Column(Integer, nullable=False)    # Sequência de exibição (1, 2, 3...)
+    
+    atividade_padrao_id = Column(Integer, ForeignKey('atividades_padrao.id'), nullable=False)
+    atividade_padrao = relationship("AtividadePadrao", back_populates="passos") 
 
 class Caso(Base):
     __tablename__ = 'casos'
     id = Column(Integer, primary_key=True)
-    data_inicio = Column(String(20)) # Formato YYYY-MM-DD
+    data_inicio = Column(String(20))
     data_final = Column(String(20), nullable=True)
     status = Column(String(50), default='Em Elaboração')
-    contexto_apresentacao = Column(Text, nullable=True) # Notas da reunião de conclusão
     
-    # Notas de revisão (se rejeitado/aprovado com ressalvas)
+    # Campos de Texto Longo
     notas_revisao = Column(Text, nullable=True)
+    contexto_apresentacao = Column(Text, nullable=True) # Notas da reunião final
     
     # Chaves Estrangeiras
     categoria_id = Column(Integer, ForeignKey('categorias.id'), nullable=True)
@@ -120,90 +143,76 @@ class Caso(Base):
     filial = relationship("Filial", back_populates="casos")
     realizado_por = relationship("Usuario", foreign_keys=[realizado_por_id])
     
-    # Relacionamento com Atividades (O coração do relatório)
+    # Relacionamentos em Cascata (Se apagar o caso, apaga atividades e anexos)
     atividades = relationship("Atividade", back_populates="caso", cascade="all, delete-orphan")
-    
-    # Relacionamento com Anexos
     anexos = relationship("Anexo", back_populates="caso", cascade="all, delete-orphan")
 
     @property
-    def numero_relatorio(self):
-        # Gera algo como "2023.001" baseado no ID
+    def numero_relatorio_display(self):
+        """Formata o número do relatório para exibição (Ex: 2026.001)"""
         ano = datetime.datetime.now().year
         return f"{ano}.{self.id:03d}"
-        
-    @property
-    def numero_relatorio_display(self):
-        """
-        Retorna uma string formatada bonita para exibir no PDF e na Lista.
-        Ex: 2025.005 10/2025 - LOJA X
-        """
-        ano_atual = datetime.datetime.now().year
-        mes_atual = datetime.datetime.now().month
-        nome_filial = self.filial.nome if self.filial else "GERAL"
-        return f"{ano_atual}.{self.id:03d} {mes_atual:02d}/{ano_atual} - {nome_filial}"
 
 class Anexo(Base):
     __tablename__ = 'anexos'
     id = Column(Integer, primary_key=True)
-    nome_arquivo = Column(String(255), nullable=False) # Nome original
-    caminho_arquivo = Column(String(500), nullable=False) # Caminho salvo no servidor
-    nome_seguro = Column(String(255), nullable=False) # Nome seguro gerado
+    nome_arquivo = Column(String(255), nullable=False)
+    caminho_arquivo = Column(String(500), nullable=False)
+    nome_seguro = Column(String(255), nullable=False)
     data_upload = Column(String(20))
     
     caso_id = Column(Integer, ForeignKey('casos.id'), nullable=False)
-    caso = relationship("Caso", back_populates="anexos")    
+    caso = relationship("Caso", back_populates="anexos") 
 
 class Atividade(Base):
     __tablename__ = 'atividades'
     id = Column(Integer, primary_key=True)
     atividade_desc = Column(Text, nullable=False)
-    testes_realizados = Column(Text, nullable=True)
     
-    # Resultado da Auditoria
-    observacao_resumo = Column(Text, nullable=True)
-    nao_conformidade = Column(Text, nullable=True)
-    recomendacao = Column(Text, nullable=True)
-    situacao = Column(String(50), nullable=True) # "Conforme", "Não Conforme", etc.
+    # Link para o POP original
+    atividade_padrao_id = Column(Integer, ForeignKey('atividades_padrao.id'), nullable=True)
     
     # Campos de Auditoria
+    testes_realizados = Column(Text, nullable=True)
+    observacao_resumo = Column(Text, nullable=True)
+    
+    # === CORREÇÃO: COLUNAS RESTAURADAS PARA EVITAR ERRO ===
+    nao_conformidade = Column(Text, nullable=True)
+    recomendacao = Column(Text, nullable=True)
+    # ======================================================
+
+    situacao = Column(String(50), nullable=True) 
     data_registro = Column(String(20))
     
-    # NOVOS CAMPOS TÉCNICOS
+    # Campos Técnicos
     periodo_inicio = Column(String(20), nullable=True)
     periodo_fim = Column(String(20), nullable=True)
-    extensao_exames = Column(String(200), nullable=True) # Ex: "100% das notas"
-    criterio_amostragem = Column(Text, nullable=True)    # Ex: "Aleatório"
-    
-    # NOVO CAMPO: POP (Copiado da AtividadePadrao)
-    instrucoes = Column(Text, nullable=True)
+    extensao_exames = Column(String(200), nullable=True)
+    criterio_amostragem = Column(Text, nullable=True)
     
     caso_id = Column(Integer, ForeignKey('casos.id'), nullable=False)
     caso = relationship("Caso", back_populates="atividades")
     
     realizado_por_id = Column(Integer, ForeignKey('usuarios.id'), nullable=True)
-    realizado_por = relationship("Usuario")
+    realizado_por = relationship("Usuario") 
 
-# --- Funções de Autenticação e Usuário ---
+# --- LÓGICA DE NEGÓCIO: USUÁRIOS ---
 
 def adicionar_usuario(session, dados):
     try:
-        # Gera username: primeiro_nome.ultimo_nome (ex: joao.silva)
+        # Gera username: joao.silva
         nomes = dados['nome_completo'].lower().split()
-        if len(nomes) > 1:
-            username_base = f"{nomes[0]}.{nomes[-1]}"
-        else:
-            username_base = nomes[0]
-            
-        # Verifica duplicidade simples (pode ser melhorado)
+        username_base = f"{nomes[0]}.{nomes[-1]}" if len(nomes) > 1 else nomes[0]
+        
+        # Garante unicidade
         username = username_base
         contador = 1
         while session.query(Usuario).filter_by(username=username).first():
             username = f"{username_base}{contador}"
             contador += 1
             
-        senha_hash = hashlib.sha256(dados['senha'].encode()).hexdigest()
-        
+        senha_hash = generate_password_hash(dados['senha'])
+
         novo_usuario = Usuario(
             codigo=dados['codigo'],
             nome_completo=dados['nome_completo'],
@@ -217,58 +226,52 @@ def adicionar_usuario(session, dados):
         return True
     except Exception as e:
         session.rollback()
-        print(f"Erro ao criar usuário: {e}")
+        print(f"Erro ao adicionar usuário: {e}")
         return False
 
 def verificar_login(session, codigo, senha):
-    senha_hash = hashlib.sha256(senha.encode()).hexdigest()
-    usuario = session.query(Usuario).filter_by(codigo=codigo, senha_hash=senha_hash).first()
-    if usuario:
-        # Retorna um dicionário simples para guardar na sessão do Flask
+    usuario = session.query(Usuario).filter_by(codigo=codigo).first()
+    if usuario and check_password_hash(usuario.senha_hash, senha):
         return {'id': usuario.id, 'nome': usuario.nome_completo, 'role': usuario.role}
     return None
 
 def buscar_usuario_por_id(session, user_id):
-    return session.query(Usuario).filter_by(id=user_id).first()
+    # O joinedload(Usuario.gerente) impede que o sistema trave ao tentar ler o gerente depois
+    return session.query(Usuario).options(
+        joinedload(Usuario.gerente)
+    ).filter_by(id=user_id).first()
 
 def buscar_todos_usuarios(session):
-    return session.query(Usuario).all()
+    # Carrega o usuário E o seu gerente na mesma consulta
+    return session.query(Usuario).options(joinedload(Usuario.gerente)).all()
 
 def buscar_usuario_por_codigo(session, codigo):
     usuario = session.query(Usuario).filter_by(codigo=codigo).first()
-    if usuario:
-        return object_as_dict(usuario)
-    return None
+    return object_as_dict(usuario) if usuario else None
 
 def atualizar_usuario(session, user_id, dados_novos):
     try:
         usuario = session.query(Usuario).filter_by(id=user_id).first()
-        if not usuario:
-            return False
+        if not usuario: return False
             
         if 'nome_completo' in dados_novos: usuario.nome_completo = dados_novos['nome_completo']
         if 'codigo' in dados_novos: usuario.codigo = dados_novos['codigo']
         if 'role' in dados_novos: usuario.role = dados_novos['role']
-        if 'username' in dados_novos: usuario.username = dados_novos['username']
         if 'gerente_id' in dados_novos: usuario.gerente_id = dados_novos['gerente_id']
         
         if 'senha' in dados_novos and dados_novos['senha']:
-            usuario.senha_hash = hashlib.sha256(dados_novos['senha'].encode()).hexdigest()
+            usuario.senha_hash = generate_password_hash(dados_novos['senha'])
             
         session.commit()
         return True
-    except Exception as e:
+    except Exception:
         session.rollback()
-        print(f"Erro ao atualizar usuário: {e}")
-        return False    
-    
-# --- Funções de Negócio (Relatórios) ---
+        return False
+
+# --- LÓGICA DE NEGÓCIO: RELATÓRIOS ---
 
 def buscar_casos(session):
-    """
-    Retorna todos os casos, já carregando as relações para evitar erros.
-    CORREÇÃO: Usando 'realizado_por' em vez de 'responsavel'.
-    """
+    # Carrega Categoria, Filial e Usuário Responsável de uma vez só
     return session.query(Caso).options(
         joinedload(Caso.categoria),
         joinedload(Caso.filial),
@@ -276,10 +279,7 @@ def buscar_casos(session):
     ).all()
 
 def buscar_caso_por_id(session, caso_id):
-    """
-    Busca um caso completo com TODAS as suas relações carregadas.
-    CORREÇÃO: Usando 'realizado_por' e 'joinedload' para atividades.
-    """
+    """Busca um caso completo, incluindo atividades, usuários e anexos."""
     return session.query(Caso).options(
         joinedload(Caso.categoria),
         joinedload(Caso.filial),
@@ -288,163 +288,133 @@ def buscar_caso_por_id(session, caso_id):
         joinedload(Caso.anexos)
     ).filter_by(id=caso_id).first()
 
-def buscar_atividade_por_id(session, atividade_id):
-    return session.query(Atividade).options(
-        joinedload(Atividade.realizado_por)
-    ).filter_by(id=atividade_id).first()
-
-def deletar_caso(session, caso_id):
-    """
-    Remove um caso completo, incluindo atividades, anexos do banco
-    E os arquivos físicos da pasta de uploads.
-    """
-    try:
-        caso = session.query(Caso).filter_by(id=caso_id).first()
-        if not caso:
-            return False
-
-        # 1. Apagar arquivos físicos dos anexos
-        for anexo in caso.anexos:
-            if anexo.caminho_arquivo and os.path.exists(anexo.caminho_arquivo):
-                try:
-                    os.remove(anexo.caminho_arquivo)
-                except Exception as e:
-                    print(f"Erro ao apagar arquivo físico {anexo.caminho_arquivo}: {e}")
-
-        # 2. Ao deletar o Caso, o SQLAlchemy deve apagar as Atividades e Anexos (Cascade)
-        session.delete(caso)
-        session.commit()
-        return True
-    except Exception as e:
-        session.rollback()
-        print(f"Erro ao deletar caso: {e}")
-        return False
-
-# --- (Restante das funções auxiliares, como buscar filiais, categorias, etc) ---
-def buscar_todas_categorias(session):
-    return session.query(Categoria).all()
-
-def buscar_todas_filiais(session):
-    return session.query(Filial).all()
-
-def buscar_categoria_por_id(session, id):
-    return session.query(Categoria).filter_by(id=id).first()
-
-def buscar_filial_por_id(session, id):
-    return session.query(Filial).filter_by(id=id).first()
-
 def criar_caso_com_atividades_padrao(session, categoria_id, filial_id, realizado_por_id):
     try:
         categoria = session.query(Categoria).filter_by(id=categoria_id).first()
         if not categoria: return None
         
-        # Cria o caso
+        # 1. Cria o Cabeçalho do Caso
         novo_caso = Caso(
             data_inicio=datetime.datetime.now().strftime("%Y-%m-%d"),
-            categoria_id=categoria_id,
-            filial_id=filial_id,
+            categoria_id=categoria_id, 
+            filial_id=filial_id, 
             realizado_por_id=realizado_por_id,
             status='Em Elaboração'
         )
         session.add(novo_caso)
-        session.flush() # Garante que novo_caso ganhe um ID
+        session.flush()
         
-        # Copia atividades padrão
+        # 2. Copia as Atividades do POP (Apenas as PUBLICADAS)
         for atividade_padrao in categoria.atividades_padrao:
-            nova_atividade = Atividade(
-                caso=novo_caso,
-                atividade_desc=atividade_padrao.descricao,
-                instrucoes=atividade_padrao.instrucoes, # Copia o manual POP
-                situacao="Pendente",
-                data_registro=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            )
-            session.add(nova_atividade)
+            if atividade_padrao.status == 'Publicado':
+                nova_atividade = Atividade(
+                    caso=novo_caso,
+                    atividade_desc=atividade_padrao.titulo,
+                    atividade_padrao_id=atividade_padrao.id,
+                    situacao="Pendente",
+                    data_registro=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                )
+                session.add(nova_atividade)
             
         session.commit()
         return novo_caso.id
     except Exception as e:
         session.rollback()
-        print(f"Erro ao criar caso: {e}")
+        print(f"Erro criar caso: {e}")
         return None
 
-def salvar_atividade(session, dados):
-    try:
-        # Verifica se já existe atividade (lógica simplificada para insert novo)
-        nova_atv = Atividade(**dados)
-        session.add(nova_atv)
-        session.commit()
-        return True
-    except Exception as e:
-        session.rollback()
-        print(f"Erro: {e}")
-        return False
-
-def atualizar_atividade(session, id_atividade, dados_atualizados):
-    try:
-        session.query(Atividade).filter_by(id=id_atividade).update(dados_atualizados)
-        session.commit()
-        return True
-    except Exception as e:
-        session.rollback()
-        print(f"Erro ao atualizar atividade: {e}")
-        return False
-
 def atualizar_relatorio(session, id_caso, dados_atualizados):
-    try:
+    try: 
         session.query(Caso).filter_by(id=id_caso).update(dados_atualizados)
         session.commit()
         return True
+    except Exception:
+        session.rollback()
+        return False
+
+def deletar_caso(session, caso_id):
+    try:
+        caso = session.query(Caso).filter_by(id=caso_id).first()
+        if not caso: return False
+        
+        # Apaga arquivos físicos
+        for anexo in caso.anexos:
+            if anexo.caminho_arquivo and os.path.exists(anexo.caminho_arquivo):
+                try:
+                    os.remove(anexo.caminho_arquivo)
+                except OSError:
+                    pass
+                
+        session.delete(caso)
+        session.commit()
+        return True
+    except Exception:
+        session.rollback()
+        return False 
+
+# --- LÓGICA DE NEGÓCIO: ATIVIDADES E ANEXOS ---
+
+def buscar_atividade_por_id(session, atividade_id):
+    return session.query(Atividade).options(joinedload(Atividade.realizado_por)).filter_by(id=atividade_id).first()
+
+def salvar_atividade(session, dados):
+    try:
+        # Tenta criar a atividade (Agora o modelo aceita nao_conformidade)
+        nova_atividade = Atividade(**dados)
+        session.add(nova_atividade)
+        session.commit()
+        return True
     except Exception as e:
         session.rollback()
-        print(f"Erro ao atualizar relatorio: {e}")
+        # Debug essencial
+        print(f"🔴 ERRO AO SALVAR ATIVIDADE: {e}") 
         return False
-        
-def adicionar_anexo(session, caso_id, nome_orig, nome_seguro, caminho):
+
+def atualizar_atividade(session, id_atividade, dados_atualizados):
+    try: 
+        session.query(Atividade).filter_by(id=id_atividade).update(dados_atualizados)
+        session.commit()
+        return True
+    except Exception:
+        session.rollback()
+        return False
+
+def adicionar_anexo(session, caso_id, nome, seguro, caminho):
     try:
         novo = Anexo(
-            nome_arquivo=nome_orig,
-            nome_seguro=nome_seguro,
-            caminho_arquivo=caminho,
-            data_upload=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            nome_arquivo=nome, 
+            nome_seguro=seguro, 
+            caminho_arquivo=caminho, 
+            data_upload=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 
             caso_id=caso_id
         )
         session.add(novo)
         session.commit()
         return True
-    except Exception as e:
+    except Exception:
         session.rollback()
-        print(f"Erro anexo: {e}")
         return False
+
+# --- FUNÇÕES AUXILIARES (CRUDs GERAIS) ---
 
 def adicionar_categoria(session, nome):
     try:
-        nova = Categoria(nome=nome)
-        session.add(nova)
+        session.add(Categoria(nome=nome))
         session.commit()
         return True
-    except:
+    except Exception:
         session.rollback()
         return False
 
-def adicionar_filial(session, nome, cidade):
-    try:
-        nova = Filial(nome=nome, cidade=cidade)
-        session.add(nova)
-        session.commit()
-        return True
-    except:
-        session.rollback()
-        return False
+def buscar_todas_categorias(session): return session.query(Categoria).all()
+def buscar_categoria_por_id(session, id): return session.query(Categoria).filter_by(id=id).first()
 
 def atualizar_categoria(session, id, nome):
     try:
-        cat = session.query(Categoria).filter_by(id=id).first()
-        if cat:
-            cat.nome = nome
-            session.commit()
-            return True
-        return False
-    except:
+        session.query(Categoria).filter_by(id=id).update({'nome': nome})
+        session.commit()
+        return True
+    except Exception:
         session.rollback()
         return False
 
@@ -456,9 +426,21 @@ def deletar_categoria(session, id):
             session.commit()
             return True
         return False
-    except:
+    except Exception:
         session.rollback()
         return False
+
+def adicionar_filial(session, nome, cidade):
+    try:
+        session.add(Filial(nome=nome, cidade=cidade))
+        session.commit()
+        return True
+    except Exception:
+        session.rollback()
+        return False
+
+def buscar_todas_filiais(session): return session.query(Filial).all()
+def buscar_filial_por_id(session, id): return session.query(Filial).filter_by(id=id).first()
 
 def atualizar_filial(session, id, nome, cidade):
     try:
@@ -469,7 +451,7 @@ def atualizar_filial(session, id, nome, cidade):
             session.commit()
             return True
         return False
-    except:
+    except Exception:
         session.rollback()
         return False
 
@@ -481,54 +463,29 @@ def deletar_filial(session, id):
             session.commit()
             return True
         return False
-    except:
+    except Exception:
         session.rollback()
         return False
-        
-# --- Funções para Histórico (Usadas na API) ---
 
-def buscar_historico_atividade_na_filial(session, atividade_atual):
-    """
-    Busca atividades anteriores com a mesma descrição, na mesma filial, mas de casos diferentes.
-    """
-    if not atividade_atual.caso or not atividade_atual.caso.filial_id:
-        return []
-
-    return session.query(Atividade).join(Caso).filter(
-        Atividade.atividade_desc == atividade_atual.atividade_desc, # Mesma descrição
-        Caso.filial_id == atividade_atual.caso.filial_id,           # Mesma filial
-        Caso.id != atividade_atual.caso_id,                         # Não é o caso atual
-        # Opcional: Apenas casos concluídos ou anteriores? Por enquanto traz tudo.
-    ).order_by(Caso.id.desc()).limit(5).all() # Traz os últimos 5
-
-def buscar_historico_atividade_global(session, atividade_atual):
-    """
-    Busca atividades anteriores com a mesma descrição, em TODAS as filiais.
-    """
-    return session.query(Atividade).join(Caso).filter(
-        Atividade.atividade_desc == atividade_atual.atividade_desc, # Mesma descrição
-        Caso.id != atividade_atual.caso_id                          # Não é o caso atual
-    ).order_by(Caso.id.desc()).limit(10).all() # Traz os últimos 10
-
+# --- BLOCO DE EXECUÇÃO PRINCIPAL ---
 if __name__ == '__main__':
-    # Cria as tabelas se não existirem
+    # Cria as tabelas
     init_db()
     
-    # Opcional: Cria um usuário Admin padrão se o banco estiver vazio
+    # Cria usuário ADMIN padrão se não existir
     try:
         with get_db() as sess:
             if not sess.query(Usuario).filter_by(codigo='ADMIN').first():
                 print("Criando usuário ADMIN padrão...")
-                # Criação manual para garantir o primeiro acesso
                 admin = Usuario(
                     codigo='ADMIN',
                     nome_completo='ADMINISTRADOR DO SISTEMA',
                     username='admin',
-                    senha_hash=hashlib.sha256('admin123'.encode()).hexdigest(),
+                    senha_hash=generate_password_hash('admin123'),
                     role='Admin'
                 )
                 sess.add(admin)
                 sess.commit()
                 print("Usuário ADMIN criado (Senha: admin123).")
     except Exception as e:
-        print(f"Erro ao verificar/criar admin: {e}")   
+        print(f"Erro ao verificar/criar admin: {e}")               

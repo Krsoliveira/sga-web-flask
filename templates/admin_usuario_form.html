@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Editar' if usuario_para_editar else 'Novo' }} Usuário{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">
+                    {{ 'Editar Usuário' if usuario_para_editar else 'Cadastrar Novo Usuário' }}
+                </h6>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Código (Login)*</label>
+                            <input type="text" class="form-control" name="codigo" value="{{ usuario_para_editar.codigo if usuario_para_editar else '' }}" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Username (Sistema)*</label>
+                            <input type="text" class="form-control" name="username" value="{{ usuario_para_editar.username if usuario_para_editar else '' }}" {{ 'readonly' if usuario_para_editar else '' }} placeholder="Gerado automaticamente se vazio">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Nome Completo*</label>
+                        <input type="text" class="form-control" name="nome_completo" value="{{ usuario_para_editar.nome_completo if usuario_para_editar else '' }}" required>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Perfil de Acesso*</label>
+                            <select class="form-select" name="role" required>
+                                {% for role in roles %}
+                                    <option value="{{ role }}" {{ 'selected' if usuario_para_editar and usuario_para_editar.role == role else '' }}>{{ role }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Gerente Responsável</label>
+                            <select class="form-select" name="gerente_id">
+                                <option value="">-- Nenhum --</option>
+                                {% for g in gerentes %}
+                                    <option value="{{ g.id }}" {{ 'selected' if usuario_para_editar and usuario_para_editar.gerente_id == g.id else '' }}>
+                                        {{ g.nome_completo }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <hr>
+                    <div class="mb-3">
+                        <label class="form-label">{{ 'Nova Senha (deixe em branco para manter)' if usuario_para_editar else 'Senha Inicial*' }}</label>
+                        <input type="password" class="form-control" name="{{ 'nova_senha' if usuario_para_editar else 'senha' }}" {{ 'required' if not usuario_para_editar else '' }}>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <a href="{{ url_for('listar_usuarios') }}" class="btn btn-secondary me-2">Cancelar</a>
+                        <button type="submit" class="btn btn-primary">Salvar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

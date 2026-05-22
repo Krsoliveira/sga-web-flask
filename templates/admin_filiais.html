@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}Gestão de Filiais{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 text-gray-800">Filiais</h1>
+    <a href="{{ url_for('nova_filial') }}" class="btn btn-primary shadow-sm">
+        <i class="fas fa-store me-2"></i>Nova Filial
+    </a>
+</div>
+
+<div class="card shadow mb-4">
+    <div class="card-body">
+        <table class="table table-bordered table-hover">
+            <thead class="table-light">
+                <tr>
+                    <th>ID</th>
+                    <th>Nome / Número</th>
+                    <th>Cidade</th>
+                    <th class="text-center" style="width: 150px;">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for f in filiais %}
+                <tr>
+                    <td>{{ f.id }}</td>
+                    <td>{{ f.nome }}</td>
+                    <td>{{ f.cidade }}</td>
+                    <td class="text-center">
+                        <form action="{{ url_for('deletar_filial', id=f.id) }}" method="POST" onsubmit="return confirm('Tem certeza?');">
+                            <button type="submit" class="btn btn-sm btn-danger">
+                                <i class="fas fa-trash"></i> Excluir
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="4" class="text-center text-muted">Nenhuma filial cadastrada.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

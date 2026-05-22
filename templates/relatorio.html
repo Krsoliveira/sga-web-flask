@@ -191,6 +191,17 @@
                                 <textarea class="form-control" id="observacao_resumo" name="observacao_resumo" rows="3" placeholder="Descreva aqui os detalhes, irregularidades encontradas ou observações gerais."></textarea>
                             </div>
 
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="nao_conformidade" class="form-label text-danger">Ponto de Não Conformidade</label>
+                                    <textarea class="form-control border-danger" id="nao_conformidade" name="nao_conformidade" rows="3" placeholder="Se houver erro, descreva qual norma foi quebrada."></textarea>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="recomendacao" class="form-label text-success">Recomendação / Plano de Ação</label>
+                                    <textarea class="form-control border-success" id="recomendacao" name="recomendacao" rows="3" placeholder="O que deve ser feito para corrigir?"></textarea>
+                                </div>
+                            </div>
+
                             <div class="mb-4">
                                 <label for="situacao" class="form-label fw-bold">Situação Final</label>
                                 <select class="form-select border-primary" id="situacao" name="situacao" required>
@@ -229,7 +240,7 @@
                                 <h6 class="card-title">Novo Upload</h6>
                                 <form action="{{ url_for('anexar_ficheiro', id_caso=caso.id) }}" method="POST" enctype="multipart/form-data">
                                     <div class="input-group">
-                                        <input type="file" class="form-control" name="anexo" required>
+                                        <input type="file" class="form-control" name="anexo" aria-label="Selecionar arquivo para anexar" required>
                                         <button class="btn btn-outline-secondary" type="submit">Enviar</button>
                                     </div>
                                 </form>

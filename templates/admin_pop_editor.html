@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+
+{% block title %}Editor de POP{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <span class="badge bg-secondary mb-2">{{ pop.categoria.nome }}</span>
+            <h2 class="h3 text-gray-800">{{ pop.titulo }}</h2>
+            <p class="text-muted small">Editando em modo de blocos.</p>
+        </div>
+        <div>
+            <a href="{{ url_for('listar_pops') }}" class="btn btn-outline-secondary me-2">Voltar</a>
+            
+            {% if pop.status != 'Publicado' %}
+            <button onclick="publicarPOP()" class="btn btn-success">
+                <i class="fas fa-check-circle me-2"></i>Publicar Manual
+            </button>
+            {% else %}
+            <button class="btn btn-secondary" disabled>Publicado</button>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div id="editor-area" class="pb-5">
+                
+                {% for passo in pop.passos %}
+                    <div class="card mb-3 shadow-sm border-start border-4 border-{{ 'warning' if passo.tipo == 'alerta' else 'primary' }} passo-item" id="passo-{{ passo.id }}">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="badge {{ 'bg-warning text-dark' if passo.tipo == 'alerta' else 'bg-light text-dark border' }}">
+                                    {{ passo.tipo|upper }}
+                                </span>
+                                
+                                <div>
+                                    <button onclick="editarBloco({{ passo.id }}, '{{ passo.tipo }}')" class="btn btn-sm text-primary me-2" title="Editar">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button onclick="removerPasso({{ passo.id }})" class="btn btn-sm text-danger" title="Excluir">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="p-2 bg-light rounded passo-conteudo">
+                                {{ passo.conteudo | safe }}
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+
+            </div>
+
+            <div class="card shadow mt-4 border-primary">
+                <div class="card-body text-center">
+                    <h6 class="text-muted mb-3">Adicionar Novo Bloco</h6>
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn btn-outline-primary" onclick="adicionarBloco('texto')">
+                            <i class="fas fa-paragraph me-2"></i>Texto
+                        </button>
+                        <button type="button" class="btn btn-outline-warning text-dark" onclick="adicionarBloco('alerta')">
+                            <i class="fas fa-exclamation-triangle me-2"></i>Alerta
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" disabled title="Em breve">
+                            <i class="fas fa-image me-2"></i>Imagem
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalEditor" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title" id="modalTitle">Editar Bloco</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="edit_id">
+                <input type="hidden" id="novo_tipo">
+                
+                <div class="mb-3">
+                    <label class="form-label">Conteúdo</label>
+                    <textarea class="form-control" id="novo_conteudo" rows="6" placeholder="Digite as instruções aqui..."></textarea>
+                    <div class="form-text">Você pode usar HTML simples se souber (negrito, quebras de linha).</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="salvarPasso()">Salvar Bloco</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    var modalEditor;
+    var popId = {{ pop.id }};
+
+    document.addEventListener('DOMContentLoaded', function() {
+        modalEditor = new bootstrap.Modal(document.getElementById('modalEditor'));
+    });
+
+    // 1. Função para abrir modal em modo CRIAÇÃO
+    function adicionarBloco(tipo) {
+        // Limpa o ID para indicar que é novo
+        document.getElementById('edit_id').value = ''; 
+        document.getElementById('novo_tipo').value = tipo;
+        document.getElementById('novo_conteudo').value = '';
+        document.getElementById('modalTitle').innerText = "Adicionar Novo Bloco";
+        
+        if(tipo === 'alerta') {
+            document.getElementById('novo_conteudo').placeholder = "⚠️ CUIDADO! Digite aqui o alerta de segurança...";
+        } else {
+            document.getElementById('novo_conteudo').placeholder = "Digite o passo a passo aqui...";
+        }
+        
+        modalEditor.show();
+    }
+
+    // 2. Função para abrir modal em modo EDIÇÃO (NOVA)
+    function editarBloco(id, tipo) {
+        // Pega o conteúdo atual do HTML
+        const conteudoAtual = document.querySelector(`#passo-${id} .passo-conteudo`).innerHTML.trim();
+        
+        // Preenche o modal com os dados existentes
+        document.getElementById('edit_id').value = id;
+        document.getElementById('novo_tipo').value = tipo;
+        document.getElementById('novo_conteudo').value = conteudoAtual;
+        document.getElementById('modalTitle').innerText = "Editar Bloco Existente";
+        
+        modalEditor.show();
+    }
+
+    // 3. Função Unificada para SALVAR (Cria ou Atualiza)
+    function salvarPasso() {
+        const id = document.getElementById('edit_id').value;
+        const tipo = document.getElementById('novo_tipo').value;
+        const conteudo = document.getElementById('novo_conteudo').value;
+        const ordem = document.querySelectorAll('.passo-item').length + 1;
+
+        if (!conteudo) { alert("O conteúdo não pode ser vazio"); return; }
+
+        let url;
+        let dados;
+
+        if (id) {
+            // Se tem ID, estamos EDITANDO
+            url = `/api/pop/atualizar_passo/${id}`;
+            dados = { tipo: tipo, conteudo: conteudo }; // Ordem mantém a mesma
+        } else {
+            // Se não tem ID, estamos CRIANDO
+            url = `/api/pop/${popId}/adicionar_passo`;
+            dados = { tipo: tipo, conteudo: conteudo, ordem: ordem };
+        }
+
+        fetch(url, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(dados)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if(data.success) {
+                window.location.reload();
+            } else {
+                alert('Erro ao salvar: ' + (data.error || 'Erro desconhecido'));
+            }
+        })
+        .catch(error => console.error('Erro:', error));
+    }
+
+    // 4. Remove Bloco
+    function removerPasso(id) {
+        if(!confirm("Tem certeza que deseja apagar este bloco?")) return;
+
+        fetch(`/api/pop/remover_passo/${id}`, { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+            if(data.success) {
+                document.getElementById(`passo-${id}`).remove();
+            } else {
+                alert('Erro ao remover.');
+            }
+        });
+    }
+
+    // 5. Publicar
+    function publicarPOP() {
+        if(!confirm("Ao publicar, este manual ficará visível para todos os auditores nos novos relatórios. Confirmar?")) return;
+
+        fetch(`/api/pop/${popId}/publicar`, { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+            if(data.success) {
+                window.location.reload();
+            }
+        });
+    }
+</script>
+{% endblock %}
